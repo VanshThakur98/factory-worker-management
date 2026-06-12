@@ -2,10 +2,12 @@ import { api } from '../services/api.js';
 import { Storage } from '../services/storage.js';
 import { showToast } from '../components/toast.js';
 import { isValidUrl } from '../utils/validators.js';
+import { escapeHtml } from '../utils/helpers.js';
 
 export async function renderSettings(container) {
   const settings = Storage.getSettings();
   const apiUrl = Storage.getApiUrl();
+  const apiHardcoded = Storage.isApiUrlHardcoded();
   let connected = false;
 
   if (apiUrl) {
@@ -17,19 +19,29 @@ export async function renderSettings(container) {
     }
   }
 
+  const apiSection = apiHardcoded ? `
+      <div class="form-group">
+        <label>Backend URL (built into app)</label>
+        <input type="text" class="form-control" value="${escapeHtml(apiUrl)}" readonly>
+      </div>
+      <button class="btn btn-primary" id="testApiUrl" style="width:100%;margin-bottom:8px">Test Connection</button>
+    ` : `
+      <div class="form-group">
+        <label>Google Apps Script Web App URL</label>
+        <input type="url" class="form-control" id="apiUrl" value="${escapeHtml(apiUrl)}" placeholder="https://script.google.com/macros/s/.../exec">
+      </div>
+      <button class="btn btn-primary" id="saveApiUrl" style="width:100%;margin-bottom:8px">Save & Test Connection</button>
+    `;
+
   container.innerHTML = `
     <div class="connection-status ${connected ? 'connected' : 'disconnected'}">
       <span class="status-dot"></span>
-      ${connected ? 'Connected to backend' : 'Not connected — configure API URL below'}
+      ${connected ? 'Connected to backend' : apiHardcoded ? 'Not connected — check your Apps Script deployment' : 'Not connected — configure API URL below'}
     </div>
 
     <div class="settings-section">
       <h3>API Configuration</h3>
-      <div class="form-group">
-        <label>Google Apps Script Web App URL</label>
-        <input type="url" class="form-control" id="apiUrl" value="${apiUrl}" placeholder="https://script.google.com/macros/s/.../exec">
-      </div>
-      <button class="btn btn-primary" id="saveApiUrl" style="width:100%;margin-bottom:8px">Save & Test Connection</button>
+      ${apiSection}
       <button class="btn btn-secondary" id="initDb" style="width:100%">Initialize Database Sheets</button>
     </div>
 
@@ -81,7 +93,19 @@ export async function renderSettings(container) {
     </div>
   `;
 
-  container.querySelector('#saveApiUrl').addEventListener('click', async () => {
+  const testConnection = async () => {
+    try {
+      await api.ping();
+      showToast('Connected successfully!', 'success');
+      renderSettings(container);
+    } catch (e) {
+      showToast('Connection failed: ' + e.message, 'error');
+    }
+  };
+
+  container.querySelector('#testApiUrl')?.addEventListener('click', testConnection);
+
+  container.querySelector('#saveApiUrl')?.addEventListener('click', async () => {
     const url = container.querySelector('#apiUrl').value.trim();
     if (!url || !isValidUrl(url)) {
       showToast('Enter a valid URL', 'error');
@@ -89,13 +113,7 @@ export async function renderSettings(container) {
     }
 
     api.setBaseUrl(url);
-    try {
-      const result = await api.ping();
-      showToast('Connected successfully!', 'success');
-      renderSettings(container);
-    } catch (e) {
-      showToast('Connection failed: ' + e.message, 'error');
-    }
+    await testConnection();
   });
 
   container.querySelector('#initDb').addEventListener('click', async () => {

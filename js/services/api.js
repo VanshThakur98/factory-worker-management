@@ -1,159 +1,159 @@
 import { Storage } from './storage.js';
 
 class ApiService {
-  constructor() {
-    this.baseUrl = Storage.getApiUrl();
-    this.offline = false;
-  }
-
-  setBaseUrl(url) {
-    this.baseUrl = url.replace(/\/$/, '');
-    Storage.setApiUrl(url);
-  }
-
-  getBaseUrl() {
-    return this.baseUrl || Storage.getApiUrl();
-  }
-
-  async request(action, data = {}, options = {}) {
-    const url = this.getBaseUrl();
-
-    if (!url && !options.allowOffline) {
-      throw new Error('API URL not configured. Go to Settings to set your Google Apps Script Web App URL.');
+    constructor() {
+        this.baseUrl = 'https://script.google.com/macros/s/AKfycbz245KUaw5bAWR46q1P8j1UGCfYXuIj-KfsCn1YnCKqSD3BB0GQ4jO_j6PIgzk3rYv45A/exec';
+        this.offline = false;
     }
 
-    const payload = { action, ...data };
-
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload),
-        mode: 'cors'
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-
-      if (result.success === false) {
-        throw new Error(result.error || 'Request failed');
-      }
-
-      this.offline = false;
-      this.cacheResult(action, result, data);
-      return result;
-    } catch (error) {
-      const cached = this.getCachedResult(action, data);
-      if (cached) {
-        this.offline = true;
-        return { ...cached, offline: true };
-      }
-
-      if (options.allowOffline) {
-        this.offline = true;
-        return { success: true, data: [], offline: true };
-      }
-
-      throw error;
+    setBaseUrl(url) {
+        this.baseUrl = String(url).trim().replace(/\/$/, '');
+        Storage.setApiUrl(this.baseUrl);
     }
-  }
 
-  cacheResult(action, result, params) {
-    const cacheKey = `${action}_${JSON.stringify(params)}`;
-    Storage.cacheData(cacheKey, result);
-  }
+    getBaseUrl() {
+        return this.baseUrl;
+    }
 
-  getCachedResult(action, params) {
-    const cacheKey = `${action}_${JSON.stringify(params)}`;
-    return Storage.getCachedData(cacheKey, 86400000);
-  }
+    async request(action, data = {}, options = {}) {
+        const url = this.getBaseUrl();
 
-  isOffline() {
-    return this.offline || !navigator.onLine;
-  }
+        if (!url && !options.allowOffline) {
+            throw new Error('API URL not configured. Set APPS_SCRIPT_API_URL in js/config.js.');
+        }
 
-  async ping() {
-    return this.request('ping', {}, { allowOffline: true });
-  }
+        const payload = { action, ...data };
 
-  async initialize() {
-    return this.request('initialize');
-  }
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(payload),
+                mode: 'cors'
+            });
 
-  async getWorkers(params = {}) {
-    return this.request('getWorkers', params);
-  }
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
 
-  async addWorker(data) {
-    return this.request('addWorker', { data });
-  }
+            const result = await response.json();
 
-  async updateWorker(data) {
-    return this.request('updateWorker', { data });
-  }
+            if (result.success === false) {
+                throw new Error(result.error || 'Request failed');
+            }
 
-  async deleteWorker(workerId) {
-    return this.request('deleteWorker', { data: { WorkerID: workerId } });
-  }
+            this.offline = false;
+            this.cacheResult(action, result, data);
+            return result;
+        } catch (error) {
+            const cached = this.getCachedResult(action, data);
+            if (cached) {
+                this.offline = true;
+                return {...cached, offline: true };
+            }
 
-  async getAttendance(params = {}) {
-    return this.request('getAttendance', params);
-  }
+            if (options.allowOffline) {
+                this.offline = true;
+                return { success: true, data: [], offline: true };
+            }
 
-  async markAttendance(data) {
-    return this.request('markAttendance', { data });
-  }
+            throw error;
+        }
+    }
 
-  async updateAttendance(data) {
-    return this.request('updateAttendance', { data });
-  }
+    cacheResult(action, result, params) {
+        const cacheKey = `${action}_${JSON.stringify(params)}`;
+        Storage.cacheData(cacheKey, result);
+    }
 
-  async deleteAttendance(attendanceId) {
-    return this.request('deleteAttendance', { data: { AttendanceID: attendanceId } });
-  }
+    getCachedResult(action, params) {
+        const cacheKey = `${action}_${JSON.stringify(params)}`;
+        return Storage.getCachedData(cacheKey, 86400000);
+    }
 
-  async getLeaves(params = {}) {
-    return this.request('getLeaves', params);
-  }
+    isOffline() {
+        return this.offline || !navigator.onLine;
+    }
 
-  async applyLeave(data) {
-    return this.request('applyLeave', { data });
-  }
+    async ping() {
+        return this.request('ping', {}, { allowOffline: true });
+    }
 
-  async approveLeave(leaveId) {
-    return this.request('approveLeave', { data: { LeaveID: leaveId } });
-  }
+    async initialize() {
+        return this.request('initialize');
+    }
 
-  async rejectLeave(leaveId) {
-    return this.request('rejectLeave', { data: { LeaveID: leaveId } });
-  }
+    async getWorkers(params = {}) {
+        return this.request('getWorkers', params);
+    }
 
-  async getPayroll(params = {}) {
-    return this.request('getPayroll', params);
-  }
+    async addWorker(data) {
+        return this.request('addWorker', { data });
+    }
 
-  async generatePayroll(month) {
-    return this.request('generatePayroll', { data: { month } });
-  }
+    async updateWorker(data) {
+        return this.request('updateWorker', { data });
+    }
 
-  async getDashboard(params = {}) {
-    return this.request('getDashboard', params);
-  }
+    async deleteWorker(workerId) {
+        return this.request('deleteWorker', { data: { WorkerID: workerId } });
+    }
 
-  async getSettings() {
-    return this.request('getSettings', {}, { allowOffline: true });
-  }
+    async getAttendance(params = {}) {
+        return this.request('getAttendance', params);
+    }
 
-  async updateSettings(settings) {
-    return this.request('updateSettings', { data: { settings } });
-  }
+    async markAttendance(data) {
+        return this.request('markAttendance', { data });
+    }
 
-  async getReports(params) {
-    return this.request('getReports', params);
-  }
+    async updateAttendance(data) {
+        return this.request('updateAttendance', { data });
+    }
+
+    async deleteAttendance(attendanceId) {
+        return this.request('deleteAttendance', { data: { AttendanceID: attendanceId } });
+    }
+
+    async getLeaves(params = {}) {
+        return this.request('getLeaves', params);
+    }
+
+    async applyLeave(data) {
+        return this.request('applyLeave', { data });
+    }
+
+    async approveLeave(leaveId) {
+        return this.request('approveLeave', { data: { LeaveID: leaveId } });
+    }
+
+    async rejectLeave(leaveId) {
+        return this.request('rejectLeave', { data: { LeaveID: leaveId } });
+    }
+
+    async getPayroll(params = {}) {
+        return this.request('getPayroll', params);
+    }
+
+    async generatePayroll(month) {
+        return this.request('generatePayroll', { data: { month } });
+    }
+
+    async getDashboard(params = {}) {
+        return this.request('getDashboard', params);
+    }
+
+    async getSettings() {
+        return this.request('getSettings', {}, { allowOffline: true });
+    }
+
+    async updateSettings(settings) {
+        return this.request('updateSettings', { data: { settings } });
+    }
+
+    async getReports(params) {
+        return this.request('getReports', params);
+    }
 }
 
 export const api = new ApiService();

@@ -1,4 +1,10 @@
+import { APPS_SCRIPT_API_URL } from '../config.js';
+
 const PREFIX = 'fwms_';
+
+function normalizeApiUrl(url) {
+  return String(url || '').trim().replace(/\/$/, '');
+}
 
 export const Storage = {
   get(key, defaultValue = null) {
@@ -23,11 +29,18 @@ export const Storage = {
   },
 
   getApiUrl() {
-    return localStorage.getItem(PREFIX + 'api_url') || '';
+    const hardcoded = normalizeApiUrl(APPS_SCRIPT_API_URL);
+    if (hardcoded) return hardcoded;
+    return normalizeApiUrl(localStorage.getItem(PREFIX + 'api_url'));
+  },
+
+  isApiUrlHardcoded() {
+    return !!normalizeApiUrl(APPS_SCRIPT_API_URL);
   },
 
   setApiUrl(url) {
-    localStorage.setItem(PREFIX + 'api_url', url);
+    if (this.isApiUrlHardcoded()) return;
+    localStorage.setItem(PREFIX + 'api_url', normalizeApiUrl(url));
   },
 
   getSettings() {
