@@ -73,25 +73,26 @@
       </button>
     </nav>
 
-    <div id="moreSheet" class="bottom-sheet hidden">
-      <div class="sheet-handle"></div>
-      <div class="sheet-content">
-        <button class="sheet-item" data-page="leaves">
-          <span class="material-symbols-rounded">event_busy</span>
-          <span>Leave Management</span>
-        </button>
-        <button class="sheet-item" data-page="reports">
-          <span class="material-symbols-rounded">assessment</span>
-          <span>Reports</span>
-        </button>
-        <button class="sheet-item" data-page="settings">
-          <span class="material-symbols-rounded">settings</span>
-          <span>Settings</span>
-        </button>
-      </div>
-    </div>
-    <div id="sheetBackdrop" class="sheet-backdrop hidden"></div>
   </div>
+
+  <div id="moreSheet" class="bottom-sheet" aria-hidden="true">
+    <div class="sheet-handle"></div>
+    <div class="sheet-content">
+      <button type="button" class="sheet-item" data-page="leaves">
+        <span class="material-symbols-rounded">event_busy</span>
+        <span>Leave Management</span>
+      </button>
+      <button type="button" class="sheet-item" data-page="reports">
+        <span class="material-symbols-rounded">assessment</span>
+        <span>Reports</span>
+      </button>
+      <button type="button" class="sheet-item" data-page="settings">
+        <span class="material-symbols-rounded">settings</span>
+        <span>Settings</span>
+      </button>
+    </div>
+  </div>
+  <div id="sheetBackdrop" class="sheet-backdrop" aria-hidden="true"></div>
 
   <div id="toastContainer" class="toast-container" aria-live="polite"></div>
   <div id="dialogContainer"></div>

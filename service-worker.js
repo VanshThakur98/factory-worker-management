@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fwms-v1';
+const CACHE_NAME = 'fwms-v3';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -48,7 +48,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (url.pathname.endsWith('.js') || url.pathname.endsWith('.css') || url.pathname.endsWith('.html')) {
-    event.respondWith(cacheFirst(request));
+    event.respondWith(networkFirst(request));
     return;
   }
 
@@ -78,14 +78,19 @@ async function cacheFirst(request) {
 async function networkFirst(request) {
   try {
     const response = await fetch(request);
+    if (response.ok) {
+      const cache = await caches.open(CACHE_NAME);
+      cache.put(request, response.clone());
+    }
     return response;
   } catch (error) {
     const cached = await caches.match(request);
     if (cached) return cached;
-    return new Response(JSON.stringify({ success: false, error: 'Offline', offline: true }), {
-      status: 503,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    if (request.mode === 'navigate') {
+      const fallback = await caches.match('./index.html');
+      if (fallback) return fallback;
+    }
+    return new Response('Offline', { status: 503 });
   }
 }
 

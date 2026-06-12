@@ -136,7 +136,14 @@ export async function renderSettings(container) {
       await Promise.all(keys.map(k => caches.delete(k)));
     }
     Object.keys(localStorage).filter(k => k.startsWith('fwms_cache_')).forEach(k => localStorage.removeItem(k));
-    showToast('Cache cleared', 'success');
+
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map(r => r.unregister()));
+    }
+
+    showToast('Cache cleared — reloading app', 'success');
+    setTimeout(() => location.reload(), 800);
   });
 
   container.querySelector('#installAppBtn').addEventListener('click', () => {

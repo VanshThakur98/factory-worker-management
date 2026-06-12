@@ -20,6 +20,7 @@ const PAGE_TITLES = {
 };
 
 let currentPage = 'dashboard';
+let moreSheetOpen = false;
 
 const pages = {
   dashboard: renderDashboard,
@@ -34,6 +35,7 @@ const pages = {
 async function navigateTo(page) {
   if (!pages[page]) return;
 
+  closeMoreSheet();
   currentPage = page;
   destroyAllCharts();
 
@@ -81,42 +83,82 @@ function updateOfflineBanner() {
 
 function setupNavigation() {
   document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', () => {
-      if (item.dataset.page === 'more') {
-        openMoreSheet();
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      const page = item.dataset.page;
+      if (page === 'more') {
+        toggleMoreSheet();
       } else {
-        closeMoreSheet();
-        navigateTo(item.dataset.page);
+        navigateTo(page);
       }
     });
   });
 
   document.querySelectorAll('.sheet-item').forEach(item => {
-    item.addEventListener('click', () => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const page = item.dataset.page;
       closeMoreSheet();
-      navigateTo(item.dataset.page);
+      navigateTo(page);
     });
   });
 
   document.getElementById('sheetBackdrop').addEventListener('click', closeMoreSheet);
   document.getElementById('refreshBtn').addEventListener('click', () => navigateTo(currentPage));
+  document.getElementById('menuBtn')?.addEventListener('click', () => toggleMoreSheet());
+}
+
+function toggleMoreSheet() {
+  if (moreSheetOpen) {
+    closeMoreSheet();
+  } else {
+    openMoreSheet();
+  }
 }
 
 function openMoreSheet() {
-  document.getElementById('moreSheet').classList.add('open');
-  document.getElementById('sheetBackdrop').classList.remove('hidden');
-  requestAnimationFrame(() => document.getElementById('sheetBackdrop').classList.add('open'));
+  const sheet = document.getElementById('moreSheet');
+  const backdrop = document.getElementById('sheetBackdrop');
+
+  moreSheetOpen = true;
+  sheet.setAttribute('aria-hidden', 'false');
+  backdrop.setAttribute('aria-hidden', 'false');
+
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.classList.toggle('active', item.dataset.page === 'more');
+  });
+
+  requestAnimationFrame(() => {
+    sheet.classList.add('open');
+    backdrop.classList.add('open');
+  });
 }
 
 function closeMoreSheet() {
-  document.getElementById('moreSheet').classList.remove('open');
-  document.getElementById('sheetBackdrop').classList.remove('open');
-  setTimeout(() => document.getElementById('sheetBackdrop').classList.add('hidden'), 250);
+  const sheet = document.getElementById('moreSheet');
+  const backdrop = document.getElementById('sheetBackdrop');
+
+  if (!sheet || !backdrop) return;
+
+  moreSheetOpen = false;
+  sheet.classList.remove('open');
+  backdrop.classList.remove('open');
+  sheet.setAttribute('aria-hidden', 'true');
+  backdrop.setAttribute('aria-hidden', 'true');
+
+  if (currentPage !== 'leaves' && currentPage !== 'reports' && currentPage !== 'settings') {
+    document.querySelectorAll('.nav-item').forEach(item => {
+      item.classList.toggle('active', item.dataset.page === currentPage);
+    });
+  }
 }
 
 function setupPWA() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./service-worker.js').catch(err => {
+    navigator.serviceWorker.register('./service-worker.js').then((registration) => {
+      registration.update();
+    }).catch(err => {
       console.warn('SW registration failed:', err);
     });
   }
@@ -159,6 +201,7 @@ function getInitialPage() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  closeMoreSheet();
   setupNavigation();
   setupPWA();
   navigateTo(getInitialPage());
