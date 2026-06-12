@@ -1,0 +1,438 @@
+/* Dashboard */
+.dashboard-greeting {
+  margin-bottom: 16px;
+}
+
+.dashboard-greeting h2 {
+  font-size: 1.375rem;
+  font-weight: 400;
+}
+
+.dashboard-greeting p {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 0.875rem;
+}
+
+.dashboard-date-picker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.dashboard-date-picker label {
+  font-size: 0.875rem;
+  color: var(--md-sys-color-on-surface-variant);
+  white-space: nowrap;
+}
+
+.dashboard-date-picker .form-control {
+  flex: 1;
+  max-width: 200px;
+}
+
+.chart-card {
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.monthly-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.monthly-stat {
+  text-align: center;
+  padding: 12px 8px;
+  border-radius: var(--radius-md);
+  background: var(--md-sys-color-surface-variant);
+}
+
+.monthly-stat .value {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.monthly-stat .label {
+  font-size: 0.625rem;
+  color: var(--md-sys-color-on-surface-variant);
+  text-transform: uppercase;
+}
+
+.monthly-stat.present .value { color: var(--color-present); }
+.monthly-stat.absent .value { color: var(--color-absent); }
+.monthly-stat.leave .value { color: var(--color-leave); }
+.monthly-stat.overtime .value { color: var(--color-overtime); }
+
+/* Workers page */
+.page-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.sort-select {
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--md-sys-color-outline);
+  background: var(--md-sys-color-surface-variant);
+  color: var(--md-sys-color-on-surface);
+  font-family: inherit;
+  font-size: 0.8125rem;
+}
+
+/* Attendance page */
+.date-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border-radius: var(--radius-lg);
+}
+
+.date-nav h3 {
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.date-nav-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.date-nav-center .form-control {
+  font-size: 0.8125rem;
+  padding: 6px 10px;
+  max-width: 160px;
+}
+
+.attendance-worker-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.attendance-worker-row .worker-avatar.small {
+  width: 40px;
+  height: 40px;
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+
+.attendance-worker-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.attendance-worker-info strong {
+  display: block;
+  font-size: 0.9375rem;
+}
+
+.attendance-worker-info p {
+  font-size: 0.8125rem;
+  color: var(--md-sys-color-on-surface-variant);
+  margin-top: 2px;
+}
+
+.attendance-worker-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.worker-card-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.timeline-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px 0;
+  position: relative;
+}
+
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 36px;
+  bottom: -12px;
+  width: 2px;
+  background: var(--glass-border);
+}
+
+.timeline-item:last-child::before { display: none; }
+
+.timeline-marker {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.timeline-content {
+  flex: 1;
+  padding-bottom: 8px;
+}
+
+.timeline-content h4 {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.timeline-content p {
+  font-size: 0.75rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Payroll page */
+.payroll-summary {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.payroll-card {
+  padding: 16px;
+  text-align: center;
+}
+
+.payroll-card .amount {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--md-sys-color-primary);
+}
+
+.payroll-card .label {
+  font-size: 0.75rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.payroll-worker-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.payroll-worker-row:last-child { border-bottom: none; }
+
+.payroll-worker-info h4 {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.payroll-worker-info p {
+  font-size: 0.75rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.payroll-amount {
+  text-align: right;
+}
+
+.payroll-amount strong {
+  display: block;
+  font-size: 1rem;
+  color: var(--color-present);
+}
+
+.payroll-amount span {
+  font-size: 0.6875rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Leaves page */
+.leave-balance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.leave-balance-card {
+  padding: 14px;
+  text-align: center;
+}
+
+.leave-balance-card .remaining {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.leave-balance-card .type {
+  font-size: 0.75rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.leave-balance-card .used {
+  font-size: 0.6875rem;
+  color: var(--md-sys-color-on-surface-variant);
+  margin-top: 4px;
+}
+
+.leave-card {
+  padding: 16px;
+}
+
+.leave-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.leave-card-header h4 {
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+.leave-dates {
+  font-size: 0.8125rem;
+  color: var(--md-sys-color-on-surface-variant);
+  margin-bottom: 8px;
+}
+
+.leave-reason {
+  font-size: 0.8125rem;
+  margin-bottom: 12px;
+}
+
+.leave-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Reports page */
+.report-type-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.report-type-card {
+  padding: 20px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.report-type-card:active { transform: scale(0.97); }
+
+.report-type-card .material-symbols-rounded {
+  font-size: 32px;
+  color: var(--md-sys-color-primary);
+  margin-bottom: 8px;
+}
+
+.report-type-card h4 {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/* Settings page */
+.settings-section {
+  margin-bottom: 24px;
+}
+
+.settings-section h3 {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--md-sys-color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.settings-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.settings-item:last-child { border-bottom: none; }
+
+.settings-item label {
+  font-size: 0.9375rem;
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+  font-size: 0.875rem;
+}
+
+.connection-status.connected {
+  background: rgba(52, 168, 83, 0.1);
+  color: var(--color-present);
+}
+
+.connection-status.disconnected {
+  background: rgba(234, 67, 53, 0.1);
+  color: var(--color-absent);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.about-info {
+  text-align: center;
+  padding: 24px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 0.8125rem;
+}
+
+.about-info .app-logo {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 12px;
+  background: linear-gradient(135deg, var(--md-sys-color-primary), #4285f4);
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.about-info .app-logo .material-symbols-rounded {
+  font-size: 32px;
+  color: white;
+}

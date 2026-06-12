@@ -1,0 +1,46 @@
+{
+  "name": "Factory Worker Management System",
+  "short_name": "FWMS",
+  "description": "Manage factory workers, attendance, payroll, and leaves",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0d1117",
+  "theme_color": "#1a73e8",
+  "scope": "./",
+  "lang": "en",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "assets/icons/icon-72.svg",
+      "sizes": "72x72",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Mark Attendance",
+      "url": "./index.html?page=attendance",
+      "description": "Quick attendance marking"
+    },
+    {
+      "name": "Workers",
+      "url": "./index.html?page=workers",
+      "description": "View all workers"
+    }
+  ]
+}

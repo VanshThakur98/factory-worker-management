@@ -1,0 +1,150 @@
+import { api } from '../services/api.js';
+import { Storage } from '../services/storage.js';
+import { showToast } from '../components/toast.js';
+import { isValidUrl } from '../utils/validators.js';
+
+export async function renderSettings(container) {
+  const settings = Storage.getSettings();
+  const apiUrl = Storage.getApiUrl();
+  let connected = false;
+
+  if (apiUrl) {
+    try {
+      await api.ping();
+      connected = !api.isOffline();
+    } catch {
+      connected = false;
+    }
+  }
+
+  container.innerHTML = `
+    <div class="connection-status ${connected ? 'connected' : 'disconnected'}">
+      <span class="status-dot"></span>
+      ${connected ? 'Connected to backend' : 'Not connected — configure API URL below'}
+    </div>
+
+    <div class="settings-section">
+      <h3>API Configuration</h3>
+      <div class="form-group">
+        <label>Google Apps Script Web App URL</label>
+        <input type="url" class="form-control" id="apiUrl" value="${apiUrl}" placeholder="https://script.google.com/macros/s/.../exec">
+      </div>
+      <button class="btn btn-primary" id="saveApiUrl" style="width:100%;margin-bottom:8px">Save & Test Connection</button>
+      <button class="btn btn-secondary" id="initDb" style="width:100%">Initialize Database Sheets</button>
+    </div>
+
+    <div class="settings-section">
+      <h3>Company Settings</h3>
+      <div class="form-group">
+        <label>Company Name</label>
+        <input type="text" class="form-control" id="companyName" value="${settings.companyName}">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Regular Hours/Day</label>
+          <input type="number" class="form-control" id="regularHours" value="${settings.regularHours}" min="1" max="24">
+        </div>
+        <div class="form-group">
+          <label>OT Multiplier</label>
+          <input type="number" class="form-control" id="otMultiplier" value="${settings.overtimeMultiplier}" step="0.1" min="1">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Currency</label>
+        <select class="form-control" id="currency">
+          <option value="USD" ${settings.currency === 'USD' ? 'selected' : ''}>USD ($)</option>
+          <option value="EUR" ${settings.currency === 'EUR' ? 'selected' : ''}>EUR (€)</option>
+          <option value="GBP" ${settings.currency === 'GBP' ? 'selected' : ''}>GBP (£)</option>
+          <option value="INR" ${settings.currency === 'INR' ? 'selected' : ''}>INR (₹)</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" id="saveSettings" style="width:100%">Save Settings</button>
+    </div>
+
+    <div class="settings-section">
+      <h3>PWA</h3>
+      <div class="settings-item">
+        <label>Install App</label>
+        <button class="btn btn-outline btn-sm" id="installAppBtn">Add to Home Screen</button>
+      </div>
+      <div class="settings-item">
+        <label>Clear Cache</label>
+        <button class="btn btn-outline btn-sm" id="clearCacheBtn">Clear</button>
+      </div>
+    </div>
+
+    <div class="about-info">
+      <div class="app-logo"><span class="material-symbols-rounded">factory</span></div>
+      <strong>Factory Worker Management System</strong>
+      <p>Version 1.0.0</p>
+      <p>Built with Material 3 Design</p>
+    </div>
+  `;
+
+  container.querySelector('#saveApiUrl').addEventListener('click', async () => {
+    const url = container.querySelector('#apiUrl').value.trim();
+    if (!url || !isValidUrl(url)) {
+      showToast('Enter a valid URL', 'error');
+      return;
+    }
+
+    api.setBaseUrl(url);
+    try {
+      const result = await api.ping();
+      showToast('Connected successfully!', 'success');
+      renderSettings(container);
+    } catch (e) {
+      showToast('Connection failed: ' + e.message, 'error');
+    }
+  });
+
+  container.querySelector('#initDb').addEventListener('click', async () => {
+    try {
+      await api.initialize();
+      showToast('Database initialized', 'success');
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  });
+
+  container.querySelector('#saveSettings').addEventListener('click', async () => {
+    const newSettings = {
+      companyName: container.querySelector('#companyName').value,
+      regularHours: parseFloat(container.querySelector('#regularHours').value) || 8,
+      overtimeMultiplier: parseFloat(container.querySelector('#otMultiplier').value) || 1.5,
+      currency: container.querySelector('#currency').value
+    };
+
+    Storage.setSettings(newSettings);
+
+    try {
+      await api.updateSettings({
+        CompanyName: newSettings.companyName,
+        RegularHours: String(newSettings.regularHours),
+        OvertimeMultiplier: String(newSettings.overtimeMultiplier),
+        Currency: newSettings.currency
+      });
+      showToast('Settings saved', 'success');
+    } catch {
+      showToast('Settings saved locally', 'info');
+    }
+  });
+
+  container.querySelector('#clearCacheBtn').addEventListener('click', async () => {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    Object.keys(localStorage).filter(k => k.startsWith('fwms_cache_')).forEach(k => localStorage.removeItem(k));
+    showToast('Cache cleared', 'success');
+  });
+
+  container.querySelector('#installAppBtn').addEventListener('click', () => {
+    const event = window.deferredInstallPrompt;
+    if (event) {
+      event.prompt();
+    } else {
+      showToast('Use Safari Share → Add to Home Screen', 'info');
+    }
+  });
+}
