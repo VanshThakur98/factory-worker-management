@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fwms-v8';
+const CACHE_NAME = 'fwms-v9';
 const STATIC_ASSETS = [
   './',
   './index.html',

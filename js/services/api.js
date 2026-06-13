@@ -5,7 +5,27 @@ class ApiService {
         this.baseUrl = Storage.getApiUrl() || '';
         this.offline = false;
         this.memCache = new Map();
-        this.memCacheTTL = 180000;
+        this.memCacheTTL = 60000;
+        this.forceFresh = false;
+    }
+
+    isForceFresh() {
+        return this.forceFresh;
+    }
+
+    clearAllCaches() {
+        this.memCache.clear();
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('fwms_cache_')) {
+                localStorage.removeItem(key);
+            }
+        }
+        this.forceFresh = true;
+    }
+
+    endForceFresh() {
+        this.forceFresh = false;
     }
 
     memCacheKey(action, data) {
@@ -52,7 +72,9 @@ class ApiService {
 
         const payload = { action, ...data };
 
-        if (!options.skipCache) {
+        const skipCache = options.skipCache || this.forceFresh;
+
+        if (!skipCache) {
             const memCached = this.getMemCached(action, data);
             if (memCached) {
                 this.offline = false;
@@ -66,7 +88,7 @@ class ApiService {
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify(payload),
                 mode: 'cors',
-                cache: options.skipCache ? 'no-store' : 'default'
+                cache: skipCache ? 'no-store' : 'default'
             });
 
             if (!response.ok) {
@@ -80,13 +102,13 @@ class ApiService {
             }
 
             this.offline = false;
-            if (!options.skipCache) {
+            if (!skipCache) {
                 this.cacheResult(action, result, data);
                 this.setMemCached(action, data, result);
             }
             return result;
         } catch (error) {
-            if (!options.skipCache) {
+            if (!skipCache) {
                 const cached = this.getCachedResult(action, data);
                 if (cached) {
                     this.offline = true;
@@ -135,15 +157,27 @@ class ApiService {
     }
 
     async addWorker(data) {
-        return this.request('addWorker', { data });
+        const result = await this.request('addWorker', { data });
+        this.invalidateRelatedCaches();
+        return result;
     }
 
     async updateWorker(data) {
-        return this.request('updateWorker', { data });
+        const result = await this.request('updateWorker', { data });
+        this.invalidateRelatedCaches();
+        return result;
     }
 
     async deleteWorker(workerId) {
-        return this.request('deleteWorker', { data: { WorkerID: workerId } });
+        const result = await this.request('deleteWorker', { data: { WorkerID: workerId } });
+        this.invalidateRelatedCaches();
+        return result;
+    }
+
+    invalidateRelatedCaches() {
+        ['getWorkers', 'getAttendance', 'getPayroll', 'getDashboard', 'getReports'].forEach((action) => {
+            this.invalidateActionCache(action);
+        });
     }
 
     async getAttendance(params = {}) {
@@ -154,18 +188,24 @@ class ApiService {
     async markAttendance(data) {
         const result = await this.request('markAttendance', { data });
         this.invalidateActionCache('getAttendance');
+        this.invalidateActionCache('getDashboard');
+        this.invalidateActionCache('getPayroll');
         return result;
     }
 
     async updateAttendance(data) {
         const result = await this.request('updateAttendance', { data });
         this.invalidateActionCache('getAttendance');
+        this.invalidateActionCache('getDashboard');
+        this.invalidateActionCache('getPayroll');
         return result;
     }
 
     async deleteAttendance(attendanceId) {
         const result = await this.request('deleteAttendance', { data: { AttendanceID: attendanceId } });
         this.invalidateActionCache('getAttendance');
+        this.invalidateActionCache('getDashboard');
+        this.invalidateActionCache('getPayroll');
         return result;
     }
 
@@ -190,7 +230,10 @@ class ApiService {
     }
 
     async generatePayroll(month) {
-        return this.request('generatePayroll', { data: { month } });
+        const result = await this.request('generatePayroll', { data: { month } });
+        this.invalidateActionCache('getPayroll');
+        this.invalidateActionCache('getDashboard');
+        return result;
     }
 
     async getDashboard(params = {}) {
@@ -202,7 +245,9 @@ class ApiService {
     }
 
     async updateSettings(settings) {
-        return this.request('updateSettings', { data: { settings } });
+        const result = await this.request('updateSettings', { data: { settings } });
+        this.invalidateActionCache('getSettings');
+        return result;
     }
 
     async getReports(params) {

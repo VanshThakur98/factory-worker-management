@@ -1,6 +1,6 @@
 import { renderDashboard } from './pages/dashboard.js';
 import { renderWorkers } from './pages/workers.js';
-import { renderAttendance } from './pages/attendance.js';
+import { renderAttendance, clearAttendanceCache } from './pages/attendance.js';
 import { renderPayroll } from './pages/payroll.js';
 import { renderReports } from './pages/reports.js';
 import { renderSettings } from './pages/settings.js';
@@ -79,6 +79,29 @@ async function navigateTo(page) {
   history.replaceState({ page }, '', `?page=${page}`);
 }
 
+async function refreshCurrentPage() {
+  const refreshBtn = document.getElementById('refreshBtn');
+  refreshBtn?.classList.add('spinning');
+
+  api.clearAllCaches();
+  clearAttendanceCache();
+
+  try {
+    const result = await api.getSettings();
+    if (result.data) Storage.syncSettingsFromApi(result.data);
+  } catch {
+    // keep local settings
+  }
+
+  try {
+    await navigateTo(currentPage);
+    showToast('Data refreshed from spreadsheet', 'success');
+  } finally {
+    api.endForceFresh();
+    refreshBtn?.classList.remove('spinning');
+  }
+}
+
 function showLoading(show) {
   if (show) showProcessing('Loading...');
   else hideProcessing();
@@ -114,7 +137,7 @@ function setupNavigation() {
   });
 
   document.getElementById('sheetBackdrop').addEventListener('click', closeMoreSheet);
-  document.getElementById('refreshBtn').addEventListener('click', () => navigateTo(currentPage));
+  document.getElementById('refreshBtn').addEventListener('click', () => refreshCurrentPage());
   document.getElementById('menuBtn')?.addEventListener('click', () => toggleMoreSheet());
 }
 

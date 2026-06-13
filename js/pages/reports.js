@@ -4,7 +4,7 @@ import { Storage } from '../services/storage.js';
 import { showToast } from '../components/toast.js';
 import { renderDoughnutChart, destroyAllCharts } from '../components/charts.js';
 import { exportAttendance, exportPayroll, exportWorkers, exportAttendancePDF, exportPayrollPDF, exportMonthlyReportPDF } from '../services/export.js';
-import { showDialog } from '../components/dialog.js';
+import { renderInlineLoader } from '../components/loader.js';
 
 export async function renderReports(container) {
   destroyAllCharts();
@@ -65,7 +65,7 @@ export async function renderReports(container) {
   async function loadReport(cont, type) {
     const content = cont.querySelector('#reportContent');
     const exportSection = cont.querySelector('#exportSection');
-    content.innerHTML = '<div class="spinner" style="margin:24px auto"></div>';
+    content.innerHTML = renderInlineLoader('Loading report...');
     currentReportType = type;
 
     try {

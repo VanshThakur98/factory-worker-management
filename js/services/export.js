@@ -14,11 +14,11 @@ export function exportToExcel(data, sheetName, filename) {
 
 export function exportWorkers(workers) {
   const rows = workers.map(w => ({
-    'Worker ID': w.WorkerID,
     'Name': w.WorkerName,
     'Phone': w.Phone,
     'Address': w.Address,
-    'Hourly Rate': w.HourlyRate,
+    'Pay Rate': w.HourlyRate,
+    'Rate Type': w.RateType || 'hour',
     'Join Date': w.JoinDate,
     'Status': w.Status
   }));
@@ -27,7 +27,6 @@ export function exportWorkers(workers) {
 
 export function exportAttendance(records) {
   const rows = records.map(a => ({
-    'Attendance ID': a.AttendanceID,
     'Worker': a.WorkerName,
     'Date': a.Date,
     'Time In': a.TimeIn,
@@ -44,20 +43,19 @@ export function exportAttendance(records) {
 export function exportPayroll(records) {
   const rows = records.map(p => ({
     'Worker': p.WorkerName,
-    'Month': p.Month,
-    'Total Hours': p.TotalHours,
+    'Normal Hours': p.RegularHours ?? p.TotalHours,
     'Overtime Hours': p.OvertimeHours,
-    'Hourly Rate': p.HourlyRate,
-    'Regular Pay': p.RegularPay,
+    'Normal Pay': p.RegularPay,
     'Overtime Pay': p.OvertimePay,
-    'Total Pay': p.TotalPay
+    'Total Pay': p.TotalPay,
+    'Rate': p.HourlyRate,
+    'Rate Type': p.RateType || 'hour'
   }));
   exportToExcel(rows, 'Payroll', `payroll_${Date.now()}`);
 }
 
 export function exportLeaves(leaves) {
   const rows = leaves.map(l => ({
-    'Leave ID': l.LeaveID,
     'Worker': l.WorkerName,
     'Type': l.LeaveType,
     'Start Date': l.StartDate,
@@ -171,10 +169,10 @@ export function exportPayrollPDF(records, month) {
       'Workers': records.length,
       'Total Payroll': formatCurrency(total, currency)
     },
-    columns: ['Worker', 'Hours', 'OT Hours', 'Rate', 'Regular', 'OT Pay', 'Total'],
+    columns: ['Worker', 'Normal Hrs', 'OT Hrs', 'Rate', 'Normal Pay', 'OT Pay', 'Total'],
     rows: records.map(r => [
       r.WorkerName,
-      r.TotalHours,
+      r.RegularHours ?? r.TotalHours,
       r.OvertimeHours,
       formatCurrency(r.HourlyRate, currency),
       formatCurrency(r.RegularPay, currency),

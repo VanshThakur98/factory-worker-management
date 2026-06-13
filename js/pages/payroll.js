@@ -1,5 +1,5 @@
 import { api } from '../services/api.js';
-import { formatCurrency, formatDisplayDate, getToday, getCurrentMonth, getMonthName, normalizeDate } from '../utils/helpers.js';
+import { formatCurrency, formatDisplayDate, getToday, getCurrentMonth, getMonthName, normalizeDate, getInitials } from '../utils/helpers.js';
 import { computePayrollFromAttendance, getRateLabel } from '../utils/payroll.js';
 import { showToast } from '../components/toast.js';
 import { exportPayroll, exportPayrollPDF } from '../services/export.js';
@@ -50,6 +50,7 @@ function bindEvents(container) {
       showProcessing('Saving payroll...');
       await api.generatePayroll(getCurrentMonth());
       showToast('Payroll saved for ' + getMonthName(getCurrentMonth()), 'success');
+      await loadPayroll(container);
     } catch (e) {
       showToast(e.message, 'error');
     } finally {
@@ -154,43 +155,63 @@ function renderList(container, records, settings, attendance) {
   }
 
   container.innerHTML = `
-    <div class="card">
-      <div class="section-title">Worker Earnings <button class="link" id="exportPayrollBtn">Export</button></div>
-      ${records.map(r => `
-        <div class="payroll-worker-row" data-id="${r.WorkerID}">
-          <div class="payroll-worker-info">
-            <h4>${r.WorkerName}</h4>
-            <div class="payroll-breakdown">
-              <div class="payroll-breakdown-row normal">
-                <span>Normal: ${r.RegularHours || 0}h</span>
-                <span>${formatCurrency(r.RegularPay, settings.currency)}</span>
-              </div>
-              <div class="payroll-breakdown-row overtime">
-                <span>Overtime: ${r.OvertimeHours || 0}h</span>
-                <span>${formatCurrency(r.OvertimePay, settings.currency)}</span>
-              </div>
-              <div class="payroll-breakdown-row total">
-                <span>Total (${r.PresentDays || 0} days)</span>
-                <span>${formatCurrency(r.TotalPay, settings.currency)}</span>
+    <div class="card payroll-earnings">
+      <div class="payroll-earnings-toolbar">
+        <div>
+          <h3 class="payroll-earnings-title">Worker Earnings</h3>
+          <p class="payroll-earnings-subtitle">${records.length} worker${records.length !== 1 ? 's' : ''} · tap a row for details</p>
+        </div>
+        <button class="btn btn-outline btn-sm" id="exportPayrollBtn">
+          <span class="material-symbols-rounded">download</span> Export
+        </button>
+      </div>
+      <div class="payroll-earnings-table">
+        <div class="payroll-earnings-thead">
+          <span class="col-worker">Worker</span>
+          <span class="col-normal">Normal</span>
+          <span class="col-overtime">Overtime</span>
+          <span class="col-total">Total</span>
+        </div>
+        ${records.map(r => `
+          <div class="payroll-earnings-row" data-id="${r.WorkerID}">
+            <div class="col-worker">
+              <div class="payroll-worker-cell">
+                <div class="worker-avatar small">${getInitials(r.WorkerName)}</div>
+                <div class="payroll-worker-meta">
+                  <strong>${r.WorkerName}</strong>
+                  <span>${formatCurrency(r.HourlyRate, settings.currency)}${getRateLabel(r.RateType)}</span>
+                </div>
               </div>
             </div>
-            <p style="margin-top:6px">${formatCurrency(r.HourlyRate, settings.currency)}${getRateLabel(r.RateType)}</p>
-          </div>
-        </div>`).join('')}
+            <div class="col-normal">
+              <span class="cell-hours">${r.RegularHours || 0}h</span>
+              <span class="cell-pay">${formatCurrency(r.RegularPay, settings.currency)}</span>
+              <span class="cell-meta">${r.PresentDays || 0} days</span>
+            </div>
+            <div class="col-overtime">
+              <span class="cell-hours">${r.OvertimeHours || 0}h</span>
+              <span class="cell-pay">${formatCurrency(r.OvertimePay, settings.currency)}</span>
+              <span class="cell-meta">${r.OvertimeDays || 0} OT days</span>
+            </div>
+            <div class="col-total">
+              <span class="cell-hours">${r.TotalHours || 0}h</span>
+              <span class="cell-pay total">${formatCurrency(r.TotalPay, settings.currency)}</span>
+            </div>
+          </div>`).join('')}
+      </div>
     </div>`;
 
   container.querySelector('#exportPayrollBtn')?.addEventListener('click', () => {
     const { element, close } = showDialog({
       title: 'Export Payroll',
-      content: '<p>Choose format:</p>',
+      content: '<p>Choose export format:</p>',
       footer: `<button class="btn btn-secondary" id="exportExcel">Excel</button><button class="btn btn-primary" id="exportPdf">PDF</button>`
     });
     element.querySelector('#exportExcel')?.addEventListener('click', () => { exportPayroll(payrollRecords); close(); });
     element.querySelector('#exportPdf')?.addEventListener('click', () => { exportPayrollPDF(payrollRecords, fromDate + ' to ' + toDate); close(); });
   });
 
-  container.querySelectorAll('.payroll-worker-row').forEach(row => {
-    row.style.cursor = 'pointer';
+  container.querySelectorAll('.payroll-earnings-row').forEach(row => {
     row.addEventListener('click', () => {
       const r = records.find(rec => rec.WorkerID === row.dataset.id);
       if (r) {

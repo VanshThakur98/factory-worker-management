@@ -328,6 +328,160 @@
   background: var(--md-sys-color-primary-container);
 }
 
+/* Payroll earnings table */
+.payroll-earnings {
+  padding: 0;
+  overflow: hidden;
+}
+
+.payroll-earnings-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.payroll-earnings-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.payroll-earnings-subtitle {
+  font-size: 0.75rem;
+  color: var(--md-sys-color-on-surface-variant);
+  margin: 4px 0 0;
+}
+
+.payroll-earnings-table {
+  display: flex;
+  flex-direction: column;
+}
+
+.payroll-earnings-thead,
+.payroll-earnings-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 0.9fr;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 16px;
+}
+
+.payroll-earnings-thead {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--md-sys-color-on-surface-variant);
+  background: var(--md-sys-color-surface-container);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.payroll-earnings-row {
+  cursor: pointer;
+  border-bottom: 1px solid var(--glass-border);
+  transition: background 0.15s ease;
+}
+
+.payroll-earnings-row:last-child {
+  border-bottom: none;
+}
+
+.payroll-earnings-row:hover {
+  background: rgba(26, 115, 232, 0.06);
+}
+
+.payroll-earnings-row:active {
+  background: rgba(26, 115, 232, 0.1);
+}
+
+.payroll-worker-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.payroll-worker-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.payroll-worker-meta strong {
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.payroll-worker-meta span {
+  font-size: 0.6875rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.col-normal,
+.col-overtime,
+.col-total {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cell-hours {
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.cell-pay {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.col-overtime .cell-pay {
+  color: var(--color-overtime);
+}
+
+.col-total .cell-pay.total {
+  color: var(--color-present);
+  font-size: 0.9375rem;
+}
+
+.cell-meta {
+  font-size: 0.625rem;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+@media (max-width: 480px) {
+  .payroll-earnings-thead {
+    display: none;
+  }
+
+  .payroll-earnings-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 14px 16px;
+  }
+
+  .col-normal,
+  .col-overtime,
+  .col-total {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 12px;
+    padding-left: 46px;
+  }
+
+  .col-normal::before { content: 'Normal'; font-size: 0.6875rem; color: var(--md-sys-color-on-surface-variant); grid-column: 1 / -1; }
+  .col-overtime::before { content: 'Overtime'; font-size: 0.6875rem; color: var(--color-overtime); grid-column: 1 / -1; }
+  .col-total::before { content: 'Total'; font-size: 0.6875rem; font-weight: 600; grid-column: 1 / -1; }
+
+  .cell-meta { grid-column: 1 / -1; }
+}
+
 /* Worker profile */
 .worker-profile-header {
   display: flex;

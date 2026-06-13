@@ -23,8 +23,12 @@ function clearMonthCache() {
   monthCacheData = null;
 }
 
+export function clearAttendanceCache() {
+  clearMonthCache();
+}
+
 async function loadMonthAttendance(month) {
-  if (monthCacheKey === month && monthCacheData) return monthCacheData;
+  if (!api.isForceFresh() && monthCacheKey === month && monthCacheData) return monthCacheData;
   const result = await api.getAttendance({ month });
   monthCacheKey = month;
   monthCacheData = (result.data || []).map(normalizeRecord);
