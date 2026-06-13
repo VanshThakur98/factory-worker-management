@@ -76,7 +76,7 @@ function bindEvents(container) {
 
 async function loadWorkersList(container) {
   try {
-    const workersResult = await api.getWorkers();
+    const workersResult = await api.getWorkers({ status: 'Active' });
     allWorkers = workersResult.data || [];
     const select = container.querySelector('#payrollWorker');
     select.innerHTML = '<option value="">All Workers</option>' +
@@ -102,11 +102,16 @@ async function loadPayroll(container) {
     const attResult = await api.getAttendance({ startDate: fromDate, endDate: toDate });
     let attendance = (attResult.data || []).map(r => ({ ...r, Date: normalizeDate(r.Date) }));
 
-    let workers = allWorkers.length ? allWorkers : (await api.getWorkers()).data || [];
+    let workers = allWorkers.length ? allWorkers : (await api.getWorkers({ status: 'Active' })).data || [];
 
     if (selectedWorkerId) {
       const workerId = normalizeWorkerId(selectedWorkerId);
-      attendance = attendance.filter(a => normalizeWorkerId(a.WorkerID) === workerId);
+      const worker = workers.find(w => normalizeWorkerId(w.WorkerID) === workerId);
+      const workerName = worker ? String(worker.WorkerName).trim().toLowerCase() : '';
+      attendance = attendance.filter(a => {
+        if (normalizeWorkerId(a.WorkerID) === workerId) return true;
+        return workerName && String(a.WorkerName).trim().toLowerCase() === workerName;
+      });
       workers = workers.filter(w => normalizeWorkerId(w.WorkerID) === workerId);
     }
 
@@ -214,9 +219,13 @@ function renderList(container, records, settings, attendance) {
 
   container.querySelectorAll('.payroll-earnings-row').forEach(row => {
     row.addEventListener('click', () => {
-      const r = records.find(rec => rec.WorkerID === row.dataset.id);
+      const r = records.find(rec => normalizeWorkerId(rec.WorkerID) === normalizeWorkerId(row.dataset.id));
       if (r) {
-        const workerAttendance = attendance.filter(a => normalizeWorkerId(a.WorkerID) === normalizeWorkerId(r.WorkerID));
+        const workerName = String(r.WorkerName).trim().toLowerCase();
+        const workerAttendance = attendance.filter(a => {
+          if (normalizeWorkerId(a.WorkerID) === normalizeWorkerId(r.WorkerID)) return true;
+          return workerName && String(a.WorkerName).trim().toLowerCase() === workerName;
+        });
         showPayrollDetail(r, settings, workerAttendance);
       }
     });

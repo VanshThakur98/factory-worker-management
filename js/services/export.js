@@ -151,7 +151,7 @@ export function exportPayrollPDF(records, month) {
 
   generatePDF({
     title: 'Payroll Report',
-    dateRange: getMonthName(month),
+    dateRange: /^\d{4}-\d{2}$/.test(month) ? getMonthName(month) : month,
     filename: `payroll_report_${month}`,
     summary: {
       'Workers': records.length,

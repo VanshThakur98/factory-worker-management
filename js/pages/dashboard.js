@@ -53,7 +53,7 @@ async function loadDashboardData(container, settings) {
   try {
     const [attResult, workersResult] = await Promise.all([
       api.getAttendance({ month }),
-      api.getWorkers()
+      api.getWorkers({ status: 'Active' })
     ]);
 
     const attendance = (attResult.data || []).map(r => ({ ...r, Date: normalizeDate(r.Date) }));

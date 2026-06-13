@@ -1,4 +1,4 @@
-import { buildWorkerLookup, resolveWorker, resolveWorkerId } from './helpers.js';
+import { normalizeWorkerId } from './helpers.js';
 
 /** Shared payroll calculation — used by Payroll page, Dashboard, and Worker profile */
 
@@ -83,22 +83,37 @@ export function computeWorkerPay(attendanceRecords, worker, settings) {
   };
 }
 
-export function computePayrollFromAttendance(attendance, workers, settings) {
-  const lookup = buildWorkerLookup(workers);
-  const grouped = {};
+function resolvePayrollGroupKey(record, workerMap) {
+  const name = String(record.WorkerName || '').trim().toLowerCase();
+  if (name) {
+    const match = Object.values(workerMap).find(
+      w => String(w.WorkerName || '').trim().toLowerCase() === name
+    );
+    if (match) return normalizeWorkerId(match.WorkerID);
+  }
+  const id = normalizeWorkerId(record.WorkerID);
+  if (id && workerMap[id]) return id;
+  return null;
+}
 
-  (attendance || []).forEach(a => {
-    const resolvedId = resolveWorkerId(a.WorkerID, a.WorkerName, lookup);
-    if (!resolvedId) return;
-    if (!grouped[resolvedId]) grouped[resolvedId] = [];
-    grouped[resolvedId].push(a);
+export function computePayrollFromAttendance(attendance, workers, settings) {
+  const workerMap = {};
+  (workers || []).forEach(w => {
+    const id = normalizeWorkerId(w.WorkerID);
+    if (id) workerMap[id] = w;
   });
 
-  return Object.keys(grouped).map(id => {
-    const records = grouped[id];
-    const worker = lookup.byId[id] || resolveWorker(records[0]?.WorkerID, records[0]?.WorkerName, lookup);
-    return computeWorkerPay(records, worker, settings);
-  }).sort((a, b) => b.TotalPay - a.TotalPay);
+  const grouped = {};
+  (attendance || []).forEach(a => {
+    const groupKey = resolvePayrollGroupKey(a, workerMap);
+    if (!groupKey) return;
+    if (!grouped[groupKey]) grouped[groupKey] = [];
+    grouped[groupKey].push(a);
+  });
+
+  return Object.keys(grouped).map(id =>
+    computeWorkerPay(grouped[id], workerMap[id], settings)
+  ).sort((a, b) => b.TotalPay - a.TotalPay);
 }
 
 function round2(n) {
