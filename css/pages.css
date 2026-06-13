@@ -63,7 +63,6 @@
 
 .monthly-stat.present .value { color: var(--color-present); }
 .monthly-stat.absent .value { color: var(--color-absent); }
-.monthly-stat.leave .value { color: var(--color-leave); }
 .monthly-stat.overtime .value { color: var(--color-overtime); }
 
 /* Workers page */
@@ -547,67 +546,6 @@
   background: rgba(124, 77, 255, 0.15);
   color: var(--color-overtime);
   margin-left: 4px;
-}
-
-/* Leaves page */
-.leave-balance-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.leave-balance-card {
-  padding: 14px;
-  text-align: center;
-}
-
-.leave-balance-card .remaining {
-  font-size: 1.5rem;
-  font-weight: 700;
-}
-
-.leave-balance-card .type {
-  font-size: 0.75rem;
-  color: var(--md-sys-color-on-surface-variant);
-}
-
-.leave-balance-card .used {
-  font-size: 0.6875rem;
-  color: var(--md-sys-color-on-surface-variant);
-  margin-top: 4px;
-}
-
-.leave-card {
-  padding: 16px;
-}
-
-.leave-card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 8px;
-}
-
-.leave-card-header h4 {
-  font-size: 0.9375rem;
-  font-weight: 500;
-}
-
-.leave-dates {
-  font-size: 0.8125rem;
-  color: var(--md-sys-color-on-surface-variant);
-  margin-bottom: 8px;
-}
-
-.leave-reason {
-  font-size: 0.8125rem;
-  margin-bottom: 12px;
-}
-
-.leave-actions {
-  display: flex;
-  gap: 8px;
 }
 
 /* Reports page */

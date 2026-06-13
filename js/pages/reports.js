@@ -174,7 +174,7 @@ function renderReportContent(container, type, result) {
               <tr>
                 <td>${r.WorkerName}</td>
                 <td>${formatDisplayDate(r.Date || r.StartDate)}</td>
-                <td>${r.AttendanceStatus || r.Status || r.LeaveType || '-'}</td>
+                <td>${r.AttendanceStatus || r.Status || '-'}</td>
                 <td>${r.WorkedHours || '-'}</td>
               </tr>
             `).join('')}

@@ -108,11 +108,16 @@ export async function renderSettings(container) {
 
   const testConnection = async () => {
     try {
+      showProcessing('Testing connection...');
+      api.clearAllCaches();
       await api.ping();
       showToast('Connected successfully!', 'success');
       renderSettings(container);
     } catch (e) {
-      showToast('Connection failed: ' + e.message, 'error');
+      showToast(e.message || 'Connection failed', 'error');
+      renderSettings(container);
+    } finally {
+      hideProcessing();
     }
   };
 

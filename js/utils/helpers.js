@@ -107,12 +107,8 @@ export function statusBadgeClass(status) {
     inactive: 'badge-inactive',
     present: 'badge-present',
     absent: 'badge-absent',
-    leave: 'badge-leave',
     overtime: 'badge-overtime',
-    'half day': 'badge-half',
-    pending: 'badge-pending',
-    approved: 'badge-approved',
-    rejected: 'badge-rejected'
+    'half day': 'badge-half'
   };
   return map[s] || 'badge-inactive';
 }

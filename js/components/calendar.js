@@ -28,8 +28,6 @@ export function renderCalendar(container, year, month, attendanceMap, onDateClic
         statusClass = record.overtime > 0 ? 'overtime' : 'present';
       } else if (status === 'absent') {
         statusClass = 'absent';
-      } else if (status === 'leave') {
-        statusClass = 'absent';
       }
     }
 

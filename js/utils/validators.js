@@ -41,21 +41,6 @@ export function validateAttendance(data) {
   return { valid: Object.keys(errors).length === 0, errors };
 }
 
-export function validateLeave(data) {
-  const errors = {};
-
-  if (!data.WorkerID) errors.WorkerID = 'Select a worker';
-  if (!data.LeaveType) errors.LeaveType = 'Select leave type';
-  if (!data.StartDate) errors.StartDate = 'Start date is required';
-  if (!data.EndDate) errors.EndDate = 'End date is required';
-
-  if (data.StartDate && data.EndDate && data.StartDate > data.EndDate) {
-    errors.EndDate = 'End date must be after start date';
-  }
-
-  return { valid: Object.keys(errors).length === 0, errors };
-}
-
 export function isValidPhone(phone) {
   const cleaned = String(phone).replace(/\D/g, '');
   return /^\d{10}$/.test(cleaned);

@@ -1,7 +1,7 @@
 {
   "name": "Factory Worker Management System",
   "short_name": "FWMS",
-  "description": "Manage factory workers, attendance, payroll, and leaves",
+  "description": "Manage factory workers, attendance, and payroll",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait-primary",

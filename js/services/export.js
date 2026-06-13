@@ -54,18 +54,6 @@ export function exportPayroll(records) {
   exportToExcel(rows, 'Payroll', `payroll_${Date.now()}`);
 }
 
-export function exportLeaves(leaves) {
-  const rows = leaves.map(l => ({
-    'Worker': l.WorkerName,
-    'Type': l.LeaveType,
-    'Start Date': l.StartDate,
-    'End Date': l.EndDate,
-    'Reason': l.Reason,
-    'Status': l.Status
-  }));
-  exportToExcel(rows, 'Leaves', `leaves_${Date.now()}`);
-}
-
 export function generatePDF(options) {
   if (!window.jspdf) {
     throw new Error('jsPDF library not loaded');
@@ -201,10 +189,8 @@ export function exportMonthlyReportPDF(dashboardData, month) {
     rows: [
       ['Active Workers', dashboardData.activeWorkers],
       ['Absent Today', dashboardData.absentToday],
-      ['On Leave', dashboardData.onLeaveToday],
       ['Monthly Present', dashboardData.monthlyStats?.present || 0],
       ['Monthly Absent', dashboardData.monthlyStats?.absent || 0],
-      ['Monthly Leave', dashboardData.monthlyStats?.leave || 0],
       ['Overtime Days', dashboardData.monthlyStats?.overtimeDays || 0]
     ]
   });

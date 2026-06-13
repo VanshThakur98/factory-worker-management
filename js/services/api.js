@@ -95,7 +95,19 @@ class ApiService {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
-            const result = await response.json();
+            const text = await response.text();
+            let result;
+            try {
+                result = JSON.parse(text);
+            } catch {
+                if (text.includes('doPost') || text.includes('doGet')) {
+                    throw new Error('Apps Script is missing Code.gs — copy backend/Code.gs into your project and redeploy the web app.');
+                }
+                if (text.includes('Authorization') || text.includes('sign in')) {
+                    throw new Error('Apps Script access denied — redeploy with "Who has access: Anyone".');
+                }
+                throw new Error('Server returned an invalid response. Check your Apps Script deployment URL.');
+            }
 
             if (result.success === false) {
                 throw new Error(result.error || 'Request failed');
@@ -145,7 +157,7 @@ class ApiService {
     }
 
     async ping() {
-        return this.request('ping', {}, { allowOffline: true });
+        return this.request('ping', {}, { skipCache: true });
     }
 
     async initialize() {
@@ -207,22 +219,6 @@ class ApiService {
         this.invalidateActionCache('getDashboard');
         this.invalidateActionCache('getPayroll');
         return result;
-    }
-
-    async getLeaves(params = {}) {
-        return this.request('getLeaves', params);
-    }
-
-    async applyLeave(data) {
-        return this.request('applyLeave', { data });
-    }
-
-    async approveLeave(leaveId) {
-        return this.request('approveLeave', { data: { LeaveID: leaveId } });
-    }
-
-    async rejectLeave(leaveId) {
-        return this.request('rejectLeave', { data: { LeaveID: leaveId } });
     }
 
     async getPayroll(params = {}) {
