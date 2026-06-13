@@ -54,8 +54,10 @@ export function formatCurrency(amount, currency = 'INR') {
 }
 
 export function getInitials(name) {
-  if (!name) return '?';
-  return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  if (name === null || name === undefined || name === '') return '?';
+  const str = String(name).trim();
+  if (!str) return '?';
+  return str.split(/\s+/).map(n => n[0]).join('').substring(0, 2).toUpperCase() || '?';
 }
 
 export function debounce(fn, delay = 300) {
