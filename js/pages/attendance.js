@@ -1,5 +1,5 @@
 import { api } from '../services/api.js';
-import { formatDisplayDate, getToday, getCurrentMonth, getMonthName, addDays, statusBadgeClass, getInitials, normalizeDate, normalizeTime } from '../utils/helpers.js';
+import { formatDisplayDate, getToday, getCurrentMonth, getMonthName, addDays, statusBadgeClass, getInitials, normalizeDate, normalizeTime, normalizeWorkerId } from '../utils/helpers.js';
 import { validateAttendance } from '../utils/validators.js';
 import { calculateHours } from '../utils/hours.js';
 import { showDialog, getFormData, showFormErrors } from '../components/dialog.js';
@@ -57,14 +57,16 @@ function splitDayRecords(dayRecords) {
   const otList = [];
 
   dayRecords.forEach(r => {
+    const workerId = normalizeWorkerId(r.WorkerID);
+    if (!workerId) return;
     const status = String(r.AttendanceStatus || '').toLowerCase();
     if (status === 'overtime') {
       otList.push(r);
-      if (!otByWorker[r.WorkerID]) otByWorker[r.WorkerID] = { hours: 0, records: [] };
-      otByWorker[r.WorkerID].hours += parseFloat(r.OvertimeHours) || parseFloat(r.WorkedHours) || 0;
-      otByWorker[r.WorkerID].records.push(r);
+      if (!otByWorker[workerId]) otByWorker[workerId] = { hours: 0, records: [] };
+      otByWorker[workerId].hours += parseFloat(r.OvertimeHours) || parseFloat(r.WorkedHours) || 0;
+      otByWorker[workerId].records.push(r);
     } else {
-      dailyMap[r.WorkerID] = r;
+      dailyMap[workerId] = r;
     }
   });
 
@@ -204,8 +206,9 @@ async function renderDailyView(content) {
   }
 
   list.innerHTML = workers.map(worker => {
-    const record = dailyMap[worker.WorkerID];
-    const summary = getWorkerDaySummary(worker.WorkerID, dayRecords);
+    const workerId = normalizeWorkerId(worker.WorkerID);
+    const record = dailyMap[workerId];
+    const summary = getWorkerDaySummary(workerId, dayRecords);
     const isMarked = !!record;
     const status = (record && record.AttendanceStatus) || 'Not Marked';
     const badgeClass = isMarked ? statusBadgeClass(status) : 'badge-inactive';
@@ -215,7 +218,7 @@ async function renderDailyView(content) {
       : '';
 
     return `
-      <div class="card attendance-worker-row ${isMarked ? 'attendance-marked' : 'attendance-pending'}" data-worker-id="${worker.WorkerID}">
+      <div class="card attendance-worker-row ${isMarked ? 'attendance-marked' : 'attendance-pending'}" data-worker-id="${workerId}">
         <div class="worker-avatar small ${isMarked ? 'marked' : ''}">${getInitials(worker.WorkerName)}</div>
         <div class="attendance-worker-info">
           <strong>${worker.WorkerName}</strong>
@@ -224,7 +227,7 @@ async function renderDailyView(content) {
         <div class="attendance-worker-actions">
           ${isMarked ? '<span class="material-symbols-rounded attendance-check">check_circle</span>' : ''}
           <span class="badge ${badgeClass}">${status}</span>
-          <button class="btn btn-sm ${isMarked ? 'btn-secondary' : 'btn-primary'}" data-mark="${worker.WorkerID}">${isMarked ? 'Edit' : 'Mark'}</button>
+          <button class="btn btn-sm ${isMarked ? 'btn-secondary' : 'btn-primary'}" data-mark="${workerId}">${isMarked ? 'Edit' : 'Mark'}</button>
         </div>
       </div>`;
   }).join('');
@@ -236,15 +239,17 @@ function bindDailyEvents(list, dailyMap) {
   list.querySelectorAll('[data-mark]').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const worker = workers.find(w => w.WorkerID === btn.dataset.mark);
-      if (worker) showAttendanceForm(dailyMap[worker.WorkerID] || null, worker);
+      const workerId = normalizeWorkerId(btn.dataset.mark);
+      const worker = workers.find(w => normalizeWorkerId(w.WorkerID) === workerId);
+      if (worker) showAttendanceForm(dailyMap[workerId] || null, worker);
     });
   });
   list.querySelectorAll('.attendance-worker-row').forEach(row => {
     row.addEventListener('click', (e) => {
       if (e.target.closest('[data-mark]')) return;
-      const worker = workers.find(w => w.WorkerID === row.dataset.workerId);
-      if (worker) showAttendanceForm(dailyMap[worker.WorkerID] || null, worker);
+      const workerId = normalizeWorkerId(row.dataset.workerId);
+      const worker = workers.find(w => normalizeWorkerId(w.WorkerID) === workerId);
+      if (worker) showAttendanceForm(dailyMap[workerId] || null, worker);
     });
   });
 }
@@ -263,7 +268,7 @@ async function renderOvertimeView(content) {
   }
 
   list.innerHTML = workers.map(worker => {
-    const ot = otByWorker[worker.WorkerID];
+    const ot = otByWorker[normalizeWorkerId(worker.WorkerID)];
     const otHours = ot ? ot.hours.toFixed(1) : '0';
     const entries = ot ? ot.records.length : 0;
 
@@ -283,7 +288,7 @@ async function renderOvertimeView(content) {
 
   list.querySelectorAll('[data-add-ot]').forEach(btn => {
     btn.addEventListener('click', () => {
-      const worker = workers.find(w => w.WorkerID === btn.dataset.addOt);
+      const worker = workers.find(w => normalizeWorkerId(w.WorkerID) === normalizeWorkerId(btn.dataset.addOt));
       if (worker) showOvertimeForm(null, worker);
     });
   });
@@ -304,7 +309,7 @@ async function renderOvertimeView(content) {
     list.querySelectorAll('[data-edit-ot]').forEach(btn => {
       btn.addEventListener('click', () => {
         const record = otList.find(r => r.AttendanceID === btn.dataset.editOt);
-        const worker = workers.find(w => w.WorkerID === record.WorkerID);
+        const worker = workers.find(w => normalizeWorkerId(w.WorkerID) === normalizeWorkerId(record.WorkerID));
         if (record && worker) showOvertimeForm(record, worker);
       });
     });
@@ -364,7 +369,7 @@ async function renderTimelineView(content) {
 
   const loadTimeline = async () => {
     const items = await loadMonthAttendance(currentMonth);
-    const filtered = items.filter(r => r.WorkerID === select.value);
+    const filtered = items.filter(r => normalizeWorkerId(r.WorkerID) === normalizeWorkerId(select.value));
     const list = content.querySelector('#timelineList');
     if (!filtered.length) {
       list.innerHTML = '<div class="empty-state"><p>No history</p></div>';

@@ -1,3 +1,5 @@
+import { buildWorkerLookup, resolveWorker, resolveWorkerId } from './helpers.js';
+
 /** Shared payroll calculation — used by Payroll page, Dashboard, and Worker profile */
 
 export function getRateType(worker, settings) {
@@ -82,18 +84,21 @@ export function computeWorkerPay(attendanceRecords, worker, settings) {
 }
 
 export function computePayrollFromAttendance(attendance, workers, settings) {
-  const workerMap = {};
-  (workers || []).forEach(w => { workerMap[w.WorkerID] = w; });
-
+  const lookup = buildWorkerLookup(workers);
   const grouped = {};
+
   (attendance || []).forEach(a => {
-    if (!grouped[a.WorkerID]) grouped[a.WorkerID] = [];
-    grouped[a.WorkerID].push(a);
+    const resolvedId = resolveWorkerId(a.WorkerID, a.WorkerName, lookup);
+    if (!resolvedId) return;
+    if (!grouped[resolvedId]) grouped[resolvedId] = [];
+    grouped[resolvedId].push(a);
   });
 
-  return Object.keys(grouped).map(id =>
-    computeWorkerPay(grouped[id], workerMap[id] || { WorkerID: id, WorkerName: 'Unknown', HourlyRate: 0 }, settings)
-  ).sort((a, b) => b.TotalPay - a.TotalPay);
+  return Object.keys(grouped).map(id => {
+    const records = grouped[id];
+    const worker = lookup.byId[id] || resolveWorker(records[0]?.WorkerID, records[0]?.WorkerName, lookup);
+    return computeWorkerPay(records, worker, settings);
+  }).sort((a, b) => b.TotalPay - a.TotalPay);
 }
 
 function round2(n) {

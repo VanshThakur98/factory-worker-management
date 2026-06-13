@@ -122,3 +122,43 @@ export function escapeHtml(str) {
 export function generateId(prefix) {
   return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 }
+
+/** Normalize worker IDs from sheets/API for reliable map lookups */
+export function normalizeWorkerId(id) {
+  if (id === null || id === undefined) return '';
+  return String(id).trim();
+}
+
+export function buildWorkerLookup(workers) {
+  const byId = {};
+  const byName = {};
+  (workers || []).forEach(w => {
+    const id = normalizeWorkerId(w.WorkerID);
+    if (id) byId[id] = w;
+    const name = String(w.WorkerName || '').trim().toLowerCase();
+    if (name) byName[name] = w;
+  });
+  return { byId, byName };
+}
+
+export function resolveWorkerId(workerId, workerName, lookup) {
+  const id = normalizeWorkerId(workerId);
+  if (id && lookup.byId[id]) return normalizeWorkerId(lookup.byId[id].WorkerID);
+  const name = String(workerName || '').trim().toLowerCase();
+  if (name && lookup.byName[name]) return normalizeWorkerId(lookup.byName[name].WorkerID);
+  return id;
+}
+
+export function resolveWorker(workerId, workerName, lookup) {
+  const id = normalizeWorkerId(workerId);
+  if (id && lookup.byId[id]) return lookup.byId[id];
+  const name = String(workerName || '').trim().toLowerCase();
+  if (name && lookup.byName[name]) return lookup.byName[name];
+  const displayName = String(workerName || '').trim();
+  if (!id && !displayName) return null;
+  return {
+    WorkerID: id || displayName,
+    WorkerName: displayName || id,
+    HourlyRate: 0
+  };
+}
