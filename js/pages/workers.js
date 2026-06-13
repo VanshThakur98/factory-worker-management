@@ -124,7 +124,7 @@ function renderWorkersList(container) {
             ${filtered.map(w => `
               <tr>
                 <td>${w.WorkerName}</td>
-                <td>${formatCurrency(w.HourlyRate, settings.currency)}${getRateLabel(w.RateType || 'hour')}</td>
+                <td class="money">${formatCurrency(w.HourlyRate, settings.currency)}${getRateLabel(w.RateType || 'hour')}</td>
                 <td>${w.Phone || '-'}</td>
                 <td><span class="badge ${statusBadgeClass(w.Status)}">${w.Status}</span></td>
                 <td>
@@ -298,9 +298,9 @@ async function showWorkerProfile(worker) {
             <div class="stat-label">Overtime Earnings</div>
           </div>
         </div>
-        <div class="card" style="padding:14px;background:var(--md-sys-color-primary-container);margin-bottom:16px;text-align:center">
-          <div style="font-size:0.75rem;color:var(--md-sys-color-on-surface-variant)">Total Payment</div>
-          <div style="font-size:1.5rem;font-weight:700;margin-top:4px">${formatCurrency(pay.TotalPay, settings.currency)}</div>
+        <div class="money-highlight-card">
+          <div class="money-label">Total Payment</div>
+          <div class="money-total">${formatCurrency(pay.TotalPay, settings.currency)}</div>
         </div>
         <div class="section-title">Overtime Records</div>
         <div class="card worker-ot-records" style="padding:12px">${otRecordsHtml}</div>`;

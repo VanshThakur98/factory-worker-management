@@ -1,27 +1,35 @@
 :root {
   --md-sys-color-primary: #1a73e8;
   --md-sys-color-on-primary: #ffffff;
-  --md-sys-color-primary-container: #d3e3fd;
-  --md-sys-color-on-primary-container: #041e49;
-  --md-sys-color-secondary: #5f6368;
-  --md-sys-color-on-secondary: #ffffff;
-  --md-sys-color-secondary-container: #e8eaed;
-  --md-sys-color-on-secondary-container: #1f1f1f;
-  --md-sys-color-tertiary: #188038;
-  --md-sys-color-error: #d93025;
-  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-primary-container: #1a3050;
+  --md-sys-color-on-primary-container: #c2daff;
+  --md-sys-color-surface-container: #21262d;
+  --md-sys-color-surface-container-high: #2d333b;
+  --md-sys-color-secondary: #9aa0a6;
+  --md-sys-color-on-secondary: #1f1f1f;
+  --md-sys-color-secondary-container: #2d333b;
+  --md-sys-color-on-secondary-container: #e8eaed;
+  --md-sys-color-tertiary: #6dd58c;
+  --md-sys-color-error: #f28b82;
+  --md-sys-color-on-error: #601410;
   --md-sys-color-background: #0d1117;
   --md-sys-color-on-background: #e8eaed;
   --md-sys-color-surface: #161b22;
   --md-sys-color-on-surface: #e8eaed;
   --md-sys-color-surface-variant: #21262d;
-  --md-sys-color-on-surface-variant: #9aa0a6;
-  --md-sys-color-outline: #3c4043;
+  --md-sys-color-on-surface-variant: #b0b8c1;
+  --md-sys-color-outline: #484f58;
   --md-sys-color-outline-variant: #2d333b;
 
-  --color-present: #34a853;
-  --color-absent: #ea4335;
-  --color-overtime: #4285f4;
+  --color-present: #6dd58c;
+  --color-absent: #f28b82;
+  --color-overtime: #8ab4f8;
+
+  /* High-contrast money amounts on dark surfaces */
+  --color-money: #f0f4f8;
+  --color-money-normal: #6dd58c;
+  --color-money-overtime: #8ab4f8;
+  --color-money-total: #ffffff;
 
   --glass-bg: rgba(22, 27, 34, 0.72);
   --glass-border: rgba(255, 255, 255, 0.08);
@@ -56,6 +64,17 @@
     --md-sys-color-on-surface: #1f1f1f;
     --md-sys-color-surface-variant: #f1f3f4;
     --md-sys-color-on-surface-variant: #5f6368;
+    --md-sys-color-primary-container: #d3e3fd;
+    --md-sys-color-on-primary-container: #041e49;
+    --md-sys-color-surface-container: #f1f3f4;
+    --md-sys-color-surface-container-high: #e8eaed;
+    --color-present: #188038;
+    --color-absent: #c5221f;
+    --color-overtime: #1a73e8;
+    --color-money: #1f1f1f;
+    --color-money-normal: #188038;
+    --color-money-overtime: #1a73e8;
+    --color-money-total: #041e49;
     --glass-bg: rgba(255, 255, 255, 0.78);
     --glass-border: rgba(0, 0, 0, 0.06);
   }

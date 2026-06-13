@@ -238,7 +238,15 @@
 .payroll-card .amount {
   font-size: 1.375rem;
   font-weight: 700;
-  color: var(--md-sys-color-primary);
+  color: var(--color-money);
+}
+
+.payroll-card.highlight .amount {
+  color: var(--color-money-total);
+}
+
+.payroll-card .amount.money-overtime {
+  color: var(--color-money-overtime);
 }
 
 .payroll-card .label {
@@ -273,7 +281,7 @@
 .payroll-amount strong {
   display: block;
   font-size: 1rem;
-  color: var(--color-present);
+  color: var(--color-money-normal);
 }
 
 .payroll-amount span {
@@ -296,12 +304,13 @@
 }
 
 .payroll-breakdown-row.normal { color: var(--md-sys-color-on-surface); }
-.payroll-breakdown-row.overtime { color: var(--color-overtime); }
+.payroll-breakdown-row.overtime { color: var(--color-money-overtime); }
 .payroll-breakdown-row.total {
   border-top: 1px solid var(--glass-border);
   padding-top: 10px;
   margin-top: 4px;
   font-weight: 600;
+  color: var(--color-money-total);
 }
 
 .payroll-detail-grid {
@@ -325,6 +334,24 @@
 
 .payroll-detail-section.total {
   background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+.payroll-detail-section.total p,
+.payroll-detail-section.total strong {
+  color: inherit;
+}
+
+.payroll-detail-section .money-normal {
+  color: var(--color-money-normal);
+}
+
+.payroll-detail-section .money-overtime {
+  color: var(--color-money-overtime);
+}
+
+.payroll-detail-section.total .money-total {
+  color: var(--md-sys-color-on-primary-container);
 }
 
 /* Payroll earnings table */
@@ -438,14 +465,19 @@
 .cell-pay {
   font-size: 0.875rem;
   font-weight: 600;
+  color: var(--color-money);
+}
+
+.col-normal .cell-pay {
+  color: var(--color-money-normal);
 }
 
 .col-overtime .cell-pay {
-  color: var(--color-overtime);
+  color: var(--color-money-overtime);
 }
 
 .col-total .cell-pay.total {
-  color: var(--color-present);
+  color: var(--color-money-total);
   font-size: 0.9375rem;
 }
 
@@ -512,7 +544,7 @@
 .worker-stat-card .stat-value {
   font-size: 1.125rem;
   font-weight: 700;
-  color: var(--md-sys-color-primary);
+  color: var(--color-money);
 }
 
 .worker-stat-card .stat-label {
@@ -521,7 +553,7 @@
   margin-top: 4px;
 }
 
-.worker-stat-card.overtime .stat-value { color: var(--color-overtime); }
+.worker-stat-card.overtime .stat-value { color: var(--color-money-overtime); }
 
 .worker-ot-records {
   max-height: 180px;

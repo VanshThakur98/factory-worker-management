@@ -138,7 +138,7 @@ function renderDashboard(container, records, settings) {
         <div class="label">Normal Pay · ${regHours.toFixed(1)}h</div>
       </div>
       <div class="card payroll-card">
-        <div class="amount" style="color:var(--color-overtime)">${formatCurrency(otCost, settings.currency)}</div>
+        <div class="amount money-overtime">${formatCurrency(otCost, settings.currency)}</div>
         <div class="label">Overtime Pay · ${otHours.toFixed(1)}h</div>
       </div>
       <div class="card payroll-card">
@@ -256,17 +256,17 @@ function showPayrollDetail(record, settings, attendance) {
         <div class="payroll-detail-section normal">
           <strong>Normal Working</strong>
           <p>${record.RegularHours || 0}h · ${record.PresentDays || 0} days</p>
-          <p style="font-size:1.125rem;font-weight:600;margin-top:4px">${formatCurrency(record.RegularPay, settings.currency)}</p>
+          <p class="money-normal" style="font-size:1.125rem;margin-top:4px">${formatCurrency(record.RegularPay, settings.currency)}</p>
         </div>
         <div class="payroll-detail-section overtime">
           <strong>Overtime</strong>
           <p>${record.OvertimeHours || 0}h · ${record.OvertimeDays || 0} OT days</p>
-          <p style="font-size:1.125rem;font-weight:600;margin-top:4px;color:var(--color-overtime)">${formatCurrency(record.OvertimePay, settings.currency)}</p>
+          <p class="money-overtime" style="font-size:1.125rem;margin-top:4px">${formatCurrency(record.OvertimePay, settings.currency)}</p>
         </div>
         <div class="payroll-detail-section total">
           <strong>Combined Total</strong>
           <p>${record.TotalHours || 0}h total worked</p>
-          <p style="font-size:1.25rem;font-weight:700;margin-top:4px">${formatCurrency(record.TotalPay, settings.currency)}</p>
+          <p class="money-total" style="font-size:1.25rem;margin-top:4px">${formatCurrency(record.TotalPay, settings.currency)}</p>
         </div>
         <div class="section-title">Day-by-day</div>
         <div class="card" style="padding:12px;max-height:200px;overflow-y:auto">${dayRows}</div>
