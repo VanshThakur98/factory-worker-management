@@ -50,33 +50,34 @@ async function loadDashboardData(container, settings) {
   container.querySelector('#recentActivity').innerHTML = '<div class="spinner" style="margin:16px auto"></div>';
 
   try {
-    const [dashResult, attResult, workersResult] = await Promise.all([
-      api.getDashboard({ date: selectedDate }),
-      api.getAttendance({ month, skipCache: true }),
+    const [attResult, workersResult] = await Promise.all([
+      api.getAttendance({ month }),
       api.getWorkers({ status: 'Active' })
     ]);
 
-    const data = dashResult.data || {};
     const attendance = (attResult.data || []).map(r => ({ ...r, Date: normalizeDate(r.Date) }));
-    const livePayroll = computePayrollFromAttendance(attendance, workersResult.data || [], settings);
+    const workers = workersResult.data || [];
+    const todayRecords = attendance.filter(r => normalizeDate(r.Date) === selectedDate);
+    const activeWorkers = workers.filter(w => String(w.Status).toLowerCase() === 'active');
+
+    const livePayroll = computePayrollFromAttendance(attendance, workers, settings);
     const monthlyTotal = livePayroll.reduce((s, r) => s + r.TotalPay, 0);
 
-    data.monthlyPayrollCost = monthlyTotal;
-    if (livePayroll.length) {
-      data.payrollChart = {
-        labels: livePayroll.map(p => p.WorkerName),
-        regularPay: livePayroll.map(p => p.RegularPay),
-        overtimePay: livePayroll.map(p => p.OvertimePay),
-        totalPay: livePayroll.map(p => p.TotalPay)
-      };
-    }
+    const dashData = buildClientDashboard(todayRecords, activeWorkers, attendance, livePayroll, monthlyTotal);
+    dashData.monthlyPayrollCost = monthlyTotal;
+    dashData.payrollChart = {
+      labels: livePayroll.map(p => p.WorkerName),
+      regularPay: livePayroll.map(p => p.RegularPay),
+      overtimePay: livePayroll.map(p => p.OvertimePay),
+      totalPay: livePayroll.map(p => p.TotalPay)
+    };
 
-    updateStats(data, settings, dateLabel);
-    updateMonthlyStats(data.monthlyStats);
-    updateRecentActivity(data.recentActivity || []);
+    updateStats(dashData, settings, dateLabel);
+    updateMonthlyStats(dashData.monthlyStats);
+    updateRecentActivity(dashData.recentActivity || []);
 
-    if (data.attendanceChart) renderAttendanceChart('attendanceChart', data.attendanceChart);
-    if (data.payrollChart) renderPayrollChart('payrollChart', data.payrollChart);
+    if (dashData.attendanceChart) renderAttendanceChart('attendanceChart', dashData.attendanceChart);
+    if (dashData.payrollChart) renderPayrollChart('payrollChart', dashData.payrollChart);
   } catch (error) {
     container.querySelector('#statGrid').innerHTML = `
       <div class="empty-state wide" style="grid-column:span 2">
@@ -85,6 +86,67 @@ async function loadDashboardData(container, settings) {
         <p>${error.message}</p>
       </div>`;
   }
+}
+
+function buildClientDashboard(todayRecords, activeWorkers, monthAttendance, livePayroll, monthlyTotal) {
+  const presentToday = todayRecords.filter(a => {
+    const s = String(a.AttendanceStatus || '').toLowerCase();
+    return s === 'present' || s === 'half day';
+  }).length;
+
+  const absentToday = todayRecords.filter(a =>
+    String(a.AttendanceStatus || '').toLowerCase() === 'absent'
+  ).length;
+
+  let overtimeHoursToday = 0;
+  let totalHoursToday = 0;
+  todayRecords.forEach(a => {
+    totalHoursToday += parseFloat(a.WorkedHours) || 0;
+    const s = String(a.AttendanceStatus || '').toLowerCase();
+    if (s === 'overtime') {
+      overtimeHoursToday += parseFloat(a.OvertimeHours) || parseFloat(a.WorkedHours) || 0;
+    } else {
+      overtimeHoursToday += parseFloat(a.OvertimeHours) || 0;
+    }
+  });
+
+  const unmarked = Math.max(activeWorkers.length - todayRecords.length, 0);
+
+  const byDate = {};
+  monthAttendance.forEach(a => {
+    const date = normalizeDate(a.Date);
+    if (!byDate[date]) byDate[date] = { present: 0, absent: 0, overtime: 0 };
+    const s = String(a.AttendanceStatus || '').toLowerCase();
+    if (s === 'present' || s === 'half day') byDate[date].present++;
+    else if (s === 'absent') byDate[date].absent++;
+    else if (s === 'overtime') byDate[date].overtime++;
+  });
+
+  const labels = Object.keys(byDate).sort();
+  let present = 0, absent = 0, overtime = 0;
+  monthAttendance.forEach(a => {
+    const s = String(a.AttendanceStatus || '').toLowerCase();
+    if (s === 'present' || s === 'half day') present++;
+    else if (s === 'absent') absent++;
+    else if (s === 'overtime') overtime++;
+  });
+
+  return {
+    totalWorkers: activeWorkers.length,
+    presentToday,
+    absentToday: absentToday + unmarked,
+    overtimeHoursToday: Math.round(overtimeHoursToday * 100) / 100,
+    totalHoursToday: Math.round(totalHoursToday * 100) / 100,
+    monthlyPayrollCost: monthlyTotal,
+    recentActivity: monthAttendance.slice(-10).reverse(),
+    monthlyStats: { present, absent, overtimeDays: overtime },
+    attendanceChart: {
+      labels,
+      present: labels.map(d => byDate[d].present),
+      absent: labels.map(d => byDate[d].absent),
+      overtime: labels.map(d => byDate[d].overtime)
+    }
+  };
 }
 
 function getGreeting() {
@@ -119,9 +181,9 @@ function updateStats(data, settings, dateLabel) {
     data.totalWorkers,
     data.presentToday,
     data.absentToday,
-    data.overtimeHoursToday + 'h',
-    data.totalHoursToday + 'h',
-    formatCurrency(data.monthlyPayrollCost, settings.currency)
+    (data.overtimeHoursToday || 0) + 'h',
+    (data.totalHoursToday || 0) + 'h',
+    formatCurrency(data.monthlyPayrollCost || 0, settings.currency)
   ];
 
   document.querySelectorAll('#statGrid .stat-value').forEach((el, i) => {

@@ -75,10 +75,10 @@ export function formatHours(hours) {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
-export function calculatePay(regularHours, overtimeHours, hourlyRate, overtimeMultiplier = 1.5) {
+export function calculatePay(regularHours, overtimeHours, hourlyRate) {
   const rate = parseFloat(hourlyRate) || 0;
   const regularPay = roundHours(regularHours * rate);
-  const overtimePay = roundHours(overtimeHours * rate * overtimeMultiplier);
+  const overtimePay = roundHours(overtimeHours * rate);
   return {
     regularPay,
     overtimePay,

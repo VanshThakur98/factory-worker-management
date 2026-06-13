@@ -12,7 +12,6 @@ export function getRateLabel(rateType) {
 export function computeWorkerPay(attendanceRecords, worker, settings) {
   const rateType = getRateType(worker, settings);
   const rate = parseFloat(worker.HourlyRate || worker.PayRate) || 0;
-  const multiplier = parseFloat(settings.overtimeMultiplier) || 1.5;
   const regularLimit = parseFloat(settings.regularHours) || 8;
 
   let totalWorked = 0;
@@ -42,13 +41,13 @@ export function computeWorkerPay(attendanceRecords, worker, settings) {
   if (rateType === 'day') {
     regularPay = presentDays * rate;
     const hourlyEquiv = regularLimit > 0 ? rate / regularLimit : 0;
-    overtimePay = totalOvertime * hourlyEquiv * multiplier;
+    overtimePay = totalOvertime * hourlyEquiv;
   } else if (rateType === 'minute') {
     regularPay = totalRegular * 60 * rate;
-    overtimePay = totalOvertime * 60 * rate * multiplier;
+    overtimePay = totalOvertime * 60 * rate;
   } else {
     regularPay = totalRegular * rate;
-    overtimePay = totalOvertime * rate * multiplier;
+    overtimePay = totalOvertime * rate;
   }
 
   regularPay = round2(regularPay);

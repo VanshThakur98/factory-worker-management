@@ -51,15 +51,9 @@ export async function renderSettings(container) {
         <label>Company Name</label>
         <input type="text" class="form-control" id="companyName" value="${settings.companyName}">
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Regular Hours/Day</label>
-          <input type="number" class="form-control" id="regularHours" value="${settings.regularHours}" min="1" max="24">
-        </div>
-        <div class="form-group">
-          <label>OT Multiplier</label>
-          <input type="number" class="form-control" id="otMultiplier" value="${settings.overtimeMultiplier}" step="0.1" min="1">
-        </div>
+      <div class="form-group">
+        <label>Regular Hours/Day</label>
+        <input type="number" class="form-control" id="regularHours" value="${settings.regularHours}" min="1" max="24">
       </div>
       <div class="form-group">
         <label>Default Pay Rate Type</label>
@@ -137,7 +131,6 @@ export async function renderSettings(container) {
     const newSettings = {
       companyName: container.querySelector('#companyName').value,
       regularHours: parseFloat(container.querySelector('#regularHours').value) || 8,
-      overtimeMultiplier: parseFloat(container.querySelector('#otMultiplier').value) || 1.5,
       currency: container.querySelector('#currency').value,
       defaultRateType: container.querySelector('#defaultRateType').value
     };
@@ -148,7 +141,6 @@ export async function renderSettings(container) {
       await api.updateSettings({
         CompanyName: newSettings.companyName,
         RegularHours: String(newSettings.regularHours),
-        OvertimeMultiplier: String(newSettings.overtimeMultiplier),
         Currency: newSettings.currency,
         DefaultRateType: newSettings.defaultRateType
       });

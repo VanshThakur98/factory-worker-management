@@ -1,5 +1,5 @@
 import { api } from '../services/api.js';
-import { formatCurrency, getToday, getCurrentMonth, getMonthName, getWeekRange, normalizeDate } from '../utils/helpers.js';
+import { formatCurrency, formatDisplayDate, getToday, getCurrentMonth, getMonthName, normalizeDate } from '../utils/helpers.js';
 import { computePayrollFromAttendance, getRateLabel } from '../utils/payroll.js';
 import { showToast } from '../components/toast.js';
 import { exportPayroll, exportPayrollPDF } from '../services/export.js';
@@ -7,67 +7,78 @@ import { Storage } from '../services/storage.js';
 import { showDialog } from '../components/dialog.js';
 
 let payrollRecords = [];
-let currentMonth = getCurrentMonth();
-let viewMode = 'monthly';
+let allWorkers = [];
+let fromDate = getCurrentMonth() + '-01';
+let toDate = getToday();
+let selectedWorkerId = '';
 
 export async function renderPayroll(container) {
   container.innerHTML = `
-    <div class="tabs" id="payrollTabs">
-      <button class="tab active" data-view="monthly">Monthly</button>
-      <button class="tab" data-view="weekly">Weekly</button>
-      <button class="tab" data-view="daily">Daily</button>
-    </div>
-    <div class="card date-nav glass" id="monthNav">
-      <button class="icon-btn" id="prevPayMonth"><span class="material-symbols-rounded">chevron_left</span></button>
-      <h3 id="payrollMonthLabel">${getMonthName(currentMonth)}</h3>
-      <button class="icon-btn" id="nextPayMonth"><span class="material-symbols-rounded">chevron_right</span></button>
+    <div class="card glass" style="padding:16px;margin-bottom:12px">
+      <div class="form-row">
+        <div class="form-group">
+          <label>From Date</label>
+          <input type="date" class="form-control" id="payrollFromDate" value="${fromDate}">
+        </div>
+        <div class="form-group">
+          <label>To Date</label>
+          <input type="date" class="form-control" id="payrollToDate" value="${toDate}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Worker</label>
+        <select class="form-control" id="payrollWorker">
+          <option value="">All Workers</option>
+        </select>
+      </div>
     </div>
     <div id="payrollDashboard"></div>
     <div id="payrollList"></div>
-    <button class="btn btn-primary" id="generatePayroll" style="width:100%;margin-bottom:12px">
-      <span class="material-symbols-rounded">autorenew</span> Generate & Save Payroll
+    <button class="btn btn-secondary" id="generatePayroll" style="width:100%;margin-top:12px">
+      <span class="material-symbols-rounded">save</span> Save Payroll for ${getMonthName(getCurrentMonth())}
     </button>`;
 
   bindEvents(container);
+  await loadWorkersList(container);
   await loadPayroll(container);
 }
 
 function bindEvents(container) {
   container.querySelector('#generatePayroll').addEventListener('click', async () => {
     try {
-      await api.generatePayroll(currentMonth);
-      showToast('Payroll generated and saved', 'success');
-      loadPayroll(container);
+      await api.generatePayroll(getCurrentMonth());
+      showToast('Payroll saved for ' + getMonthName(getCurrentMonth()), 'success');
     } catch (e) {
       showToast(e.message, 'error');
     }
   });
 
-  container.querySelectorAll('#payrollTabs .tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      viewMode = tab.dataset.view;
-      container.querySelectorAll('#payrollTabs .tab').forEach(t => t.classList.toggle('active', t === tab));
-      loadPayroll(container);
-    });
-  });
-
-  container.querySelector('#prevPayMonth').addEventListener('click', () => {
-    shiftMonth(-1);
-    container.querySelector('#payrollMonthLabel').textContent = getMonthName(currentMonth);
+  container.querySelector('#payrollFromDate').addEventListener('change', (e) => {
+    fromDate = e.target.value;
     loadPayroll(container);
   });
 
-  container.querySelector('#nextPayMonth').addEventListener('click', () => {
-    shiftMonth(1);
-    container.querySelector('#payrollMonthLabel').textContent = getMonthName(currentMonth);
+  container.querySelector('#payrollToDate').addEventListener('change', (e) => {
+    toDate = e.target.value;
+    loadPayroll(container);
+  });
+
+  container.querySelector('#payrollWorker').addEventListener('change', (e) => {
+    selectedWorkerId = e.target.value;
     loadPayroll(container);
   });
 }
 
-function shiftMonth(delta) {
-  const [y, m] = currentMonth.split('-').map(Number);
-  const d = new Date(y, m - 1 + delta, 1);
-  currentMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+async function loadWorkersList(container) {
+  try {
+    const workersResult = await api.getWorkers({ status: 'Active' });
+    allWorkers = workersResult.data || [];
+    const select = container.querySelector('#payrollWorker');
+    select.innerHTML = '<option value="">All Workers</option>' +
+      allWorkers.map(w => `<option value="${w.WorkerID}"${w.WorkerID === selectedWorkerId ? ' selected' : ''}>${w.WorkerName}</option>`).join('');
+  } catch {
+    allWorkers = [];
+  }
 }
 
 async function loadPayroll(container) {
@@ -76,29 +87,27 @@ async function loadPayroll(container) {
   dashboard.innerHTML = '<div class="spinner" style="margin:24px auto"></div>';
   list.innerHTML = '';
 
+  if (fromDate > toDate) {
+    dashboard.innerHTML = '<div class="empty-state"><h3>Invalid range</h3><p>From date must be before To date</p></div>';
+    return;
+  }
+
   try {
     const settings = Storage.getSettings();
-    const workersResult = await api.getWorkers({ status: 'Active' });
-    const workers = workersResult.data || [];
+    const attResult = await api.getAttendance({ startDate: fromDate, endDate: toDate });
+    let attendance = (attResult.data || []).map(r => ({ ...r, Date: normalizeDate(r.Date) }));
 
-    let attendance = [];
-    if (viewMode === 'monthly') {
-      const attResult = await api.getAttendance({ month: currentMonth, skipCache: true });
-      attendance = (attResult.data || []).map(r => ({ ...r, Date: normalizeDate(r.Date) }));
-    } else if (viewMode === 'weekly') {
-      const week = getWeekRange();
-      const attResult = await api.getAttendance({ startDate: week.start, endDate: week.end, skipCache: true });
-      attendance = (attResult.data || []).map(r => ({ ...r, Date: normalizeDate(r.Date) }));
-    } else {
-      const today = getToday();
-      const attResult = await api.getAttendance({ month: today.substring(0, 7), skipCache: true });
-      attendance = (attResult.data || []).filter(r => normalizeDate(r.Date) === today);
+    let workers = allWorkers.length ? allWorkers : (await api.getWorkers({ status: 'Active' })).data || [];
+
+    if (selectedWorkerId) {
+      attendance = attendance.filter(a => a.WorkerID === selectedWorkerId);
+      workers = workers.filter(w => w.WorkerID === selectedWorkerId);
     }
 
     payrollRecords = computePayrollFromAttendance(attendance, workers, settings);
 
     renderDashboard(dashboard, payrollRecords, settings);
-    renderList(list, payrollRecords, settings);
+    renderList(list, payrollRecords, settings, attendance);
   } catch (error) {
     dashboard.innerHTML = `<div class="empty-state"><h3>Error</h3><p>${error.message}</p></div>`;
   }
@@ -109,12 +118,14 @@ function renderDashboard(container, records, settings) {
   const otCost = records.reduce((s, r) => s + (parseFloat(r.OvertimePay) || 0), 0);
   const regCost = records.reduce((s, r) => s + (parseFloat(r.RegularPay) || 0), 0);
   const highest = records.reduce((max, r) => (!max || r.TotalPay > max.TotalPay) ? r : max, null);
+  const rangeLabel = `${formatDisplayDate(fromDate)} – ${formatDisplayDate(toDate)}`;
 
   container.innerHTML = `
+    <div class="section-title" style="margin-bottom:8px">${rangeLabel}${selectedWorkerId ? ' · ' + (records[0]?.WorkerName || 'Worker') : ''}</div>
     <div class="payroll-summary">
       <div class="card payroll-card highlight">
         <div class="amount">${formatCurrency(total, settings.currency)}</div>
-        <div class="label">Total Money Generated</div>
+        <div class="label">Total Earned</div>
       </div>
       <div class="card payroll-card">
         <div class="amount">${formatCurrency(regCost, settings.currency)}</div>
@@ -131,9 +142,9 @@ function renderDashboard(container, records, settings) {
     </div>`;
 }
 
-function renderList(container, records, settings) {
+function renderList(container, records, settings, attendance) {
   if (!records.length) {
-    container.innerHTML = '<div class="empty-state"><span class="material-symbols-rounded">payments</span><h3>No payroll data</h3><p>Mark attendance first, then payroll calculates automatically</p></div>';
+    container.innerHTML = '<div class="empty-state"><span class="material-symbols-rounded">payments</span><h3>No payroll data</h3><p>Mark attendance for this date range first</p></div>';
     return;
   }
 
@@ -160,23 +171,44 @@ function renderList(container, records, settings) {
       footer: `<button class="btn btn-secondary" id="exportExcel">Excel</button><button class="btn btn-primary" id="exportPdf">PDF</button>`
     });
     element.querySelector('#exportExcel')?.addEventListener('click', () => { exportPayroll(payrollRecords); close(); });
-    element.querySelector('#exportPdf')?.addEventListener('click', () => { exportPayrollPDF(payrollRecords, currentMonth); close(); });
+    element.querySelector('#exportPdf')?.addEventListener('click', () => { exportPayrollPDF(payrollRecords, fromDate + ' to ' + toDate); close(); });
   });
 
   container.querySelectorAll('.payroll-worker-row').forEach(row => {
     row.style.cursor = 'pointer';
     row.addEventListener('click', () => {
       const r = records.find(rec => rec.WorkerID === row.dataset.id);
-      if (r) showPayrollDetail(r, settings);
+      if (r) {
+        const workerAttendance = attendance.filter(a => a.WorkerID === r.WorkerID);
+        showPayrollDetail(r, settings, workerAttendance);
+      }
     });
   });
 }
 
-function showPayrollDetail(record, settings) {
+function showPayrollDetail(record, settings, attendance) {
+  const dayRows = (attendance || [])
+    .filter(a => {
+      const s = String(a.AttendanceStatus || '').toLowerCase();
+      return s === 'present' || s === 'half day' || s === 'overtime';
+    })
+    .sort((a, b) => String(a.Date).localeCompare(String(b.Date)))
+    .map(a => {
+      const s = String(a.AttendanceStatus || '').toLowerCase();
+      const hours = s === 'overtime'
+        ? `${a.OvertimeHours || a.WorkedHours || 0}h OT`
+        : `${a.WorkedHours || 0}h`;
+      return `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--md-sys-color-outline-variant)">
+        <span>${formatDisplayDate(a.Date)} · ${a.AttendanceStatus}</span>
+        <span>${a.TimeIn || '-'} – ${a.TimeOut || '-'} · ${hours}</span>
+      </div>`;
+    }).join('') || '<p style="color:var(--md-sys-color-on-surface-variant)">No attendance records</p>';
+
   showDialog({
     title: record.WorkerName,
     content: `
       <div style="display:grid;gap:12px">
+        <div class="card" style="padding:12px"><strong>Period:</strong> ${formatDisplayDate(fromDate)} – ${formatDisplayDate(toDate)}</div>
         <div class="card" style="padding:12px"><strong>Rate:</strong> ${formatCurrency(record.HourlyRate, settings.currency)}${getRateLabel(record.RateType)}</div>
         <div class="card" style="padding:12px"><strong>Total Hours:</strong> ${record.TotalHours}h (${record.PresentDays || 0} present days)</div>
         <div class="card" style="padding:12px"><strong>Overtime Hours:</strong> ${record.OvertimeHours}h</div>
@@ -185,6 +217,8 @@ function showPayrollDetail(record, settings) {
         <div class="card" style="padding:12px;background:var(--md-sys-color-primary-container)">
           <strong>Total Earned:</strong> ${formatCurrency(record.TotalPay, settings.currency)}
         </div>
+        <div class="section-title">Day-by-day</div>
+        <div class="card" style="padding:12px;max-height:200px;overflow-y:auto">${dayRows}</div>
       </div>`,
     footer: '<button class="btn btn-primary dialog-close-btn" style="flex:1">Close</button>'
   }).element.querySelector('.dialog-close-btn')?.addEventListener('click', function() {

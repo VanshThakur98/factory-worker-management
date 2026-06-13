@@ -615,50 +615,22 @@
 
 .action-btn.danger { color: var(--md-sys-color-error); }
 
-/* AM/PM Time Picker */
-.time-picker-wrap { margin-bottom: 12px; }
+/* Simple AM/PM Time Picker */
+.time-picker-wrap { margin-bottom: 0; }
 .time-picker-wrap label { display: block; font-size: 0.8125rem; margin-bottom: 6px; color: var(--md-sys-color-on-surface-variant); }
-.time-picker {
+.time-picker-simple {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
-  background: var(--md-sys-color-surface-variant);
-  border-radius: var(--radius-md);
-  padding: 8px;
+  gap: 6px;
 }
-.time-wheel-col { flex: 1; max-width: 72px; }
-.time-wheel {
-  height: 120px;
-  overflow-y: auto;
-  scroll-snap-type: y mandatory;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+.time-picker-simple .time-select {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 8px;
   text-align: center;
 }
-.time-wheel::-webkit-scrollbar { display: none; }
-.time-wheel-item {
-  padding: 8px 4px;
-  scroll-snap-align: center;
-  font-size: 1.125rem;
-  color: var(--md-sys-color-on-surface-variant);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.time-wheel-item.selected {
-  font-weight: 700;
-  font-size: 1.375rem;
-  color: var(--md-sys-color-primary);
-}
-.time-sep { font-size: 1.5rem; font-weight: 700; padding-bottom: 8px; }
-.ampm-col { max-width: 56px; }
-.time-display {
-  text-align: center;
-  font-size: 0.875rem;
-  color: var(--md-sys-color-primary);
-  margin-top: 6px;
-  font-weight: 500;
-}
+.time-picker-simple .ampm-select { flex: 0 0 72px; }
+.time-sep { font-size: 1.25rem; font-weight: 700; color: var(--md-sys-color-on-surface-variant); }
 
 .activity-dot.overtime { background: var(--color-overtime); }
 

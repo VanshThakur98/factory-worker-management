@@ -4,6 +4,34 @@ class ApiService {
     constructor() {
         this.baseUrl = Storage.getApiUrl() || '';
         this.offline = false;
+        this.memCache = new Map();
+        this.memCacheTTL = 180000;
+    }
+
+    memCacheKey(action, data) {
+        return `${action}_${JSON.stringify(data)}`;
+    }
+
+    getMemCached(action, data) {
+        const key = this.memCacheKey(action, data);
+        const entry = this.memCache.get(key);
+        if (!entry) return null;
+        if (Date.now() - entry.ts > this.memCacheTTL) {
+            this.memCache.delete(key);
+            return null;
+        }
+        return entry.result;
+    }
+
+    setMemCached(action, data, result) {
+        this.memCache.set(this.memCacheKey(action, data), { result, ts: Date.now() });
+    }
+
+    clearMemCacheForAction(action) {
+        const prefix = `${action}_`;
+        for (const key of this.memCache.keys()) {
+            if (key.startsWith(prefix)) this.memCache.delete(key);
+        }
     }
 
     setBaseUrl(url) {
@@ -23,6 +51,14 @@ class ApiService {
         }
 
         const payload = { action, ...data };
+
+        if (!options.skipCache) {
+            const memCached = this.getMemCached(action, data);
+            if (memCached) {
+                this.offline = false;
+                return memCached;
+            }
+        }
 
         try {
             const response = await fetch(url, {
@@ -46,6 +82,7 @@ class ApiService {
             this.offline = false;
             if (!options.skipCache) {
                 this.cacheResult(action, result, data);
+                this.setMemCached(action, data, result);
             }
             return result;
         } catch (error) {
@@ -78,6 +115,7 @@ class ApiService {
 
     invalidateActionCache(action) {
         Storage.clearCacheForAction(action);
+        this.clearMemCacheForAction(action);
     }
 
     isOffline() {

@@ -47,7 +47,6 @@ export const Storage = {
     return this.get('settings', {
       companyName: 'Factory Worker Management',
       regularHours: 8,
-      overtimeMultiplier: 1.5,
       currency: 'INR',
       defaultRateType: 'hour'
     });
@@ -61,7 +60,7 @@ export const Storage = {
     this.set(`cache_${key}`, { data, timestamp: Date.now() });
   },
 
-  getCachedData(key, maxAge = 300000) {
+  getCachedData(key, maxAge = 600000) {
     const cached = this.get(`cache_${key}`);
     if (!cached) return null;
     if (Date.now() - cached.timestamp > maxAge) return null;

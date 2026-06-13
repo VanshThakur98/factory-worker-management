@@ -14,6 +14,21 @@ let workers = [];
 let currentDate = getToday();
 let currentMonth = getCurrentMonth();
 let viewMode = 'daily';
+let monthCacheKey = null;
+let monthCacheData = null;
+
+function clearMonthCache() {
+  monthCacheKey = null;
+  monthCacheData = null;
+}
+
+async function loadMonthAttendance(month) {
+  if (monthCacheKey === month && monthCacheData) return monthCacheData;
+  const result = await api.getAttendance({ month });
+  monthCacheKey = month;
+  monthCacheData = (result.data || []).map(normalizeRecord);
+  return monthCacheData;
+}
 
 function normalizeRecord(record) {
   if (!record) return record;
@@ -27,8 +42,8 @@ function normalizeRecord(record) {
 
 async function loadAttendanceForDate(date) {
   const month = date.substring(0, 7);
-  const result = await api.getAttendance({ month, skipCache: true });
-  return (result.data || []).map(normalizeRecord).filter(r => normalizeDate(r.Date) === date);
+  const monthData = await loadMonthAttendance(month);
+  return monthData.filter(r => normalizeDate(r.Date) === date);
 }
 
 function splitDayRecords(dayRecords) {
@@ -127,12 +142,8 @@ function renderDateNav(content, onChange) {
 }
 
 async function renderDailyView(content) {
-  const [dayRecords, workersResult] = await Promise.all([
-    loadAttendanceForDate(currentDate),
-    api.getWorkers({ status: 'Active' })
-  ]);
+  const dayRecords = await loadAttendanceForDate(currentDate);
   records = dayRecords;
-  workers = workersResult.data || [];
   const { dailyMap } = splitDayRecords(dayRecords);
 
   const markedCount = Object.keys(dailyMap).length;
@@ -191,11 +202,7 @@ function bindDailyEvents(list, dailyMap) {
 }
 
 async function renderOvertimeView(content) {
-  const [dayRecords, workersResult] = await Promise.all([
-    loadAttendanceForDate(currentDate),
-    api.getWorkers({ status: 'Active' })
-  ]);
-  workers = workersResult.data || [];
+  const dayRecords = await loadAttendanceForDate(currentDate);
   const { otByWorker, otList } = splitDayRecords(dayRecords);
 
   const list = renderDateNav(content, () => renderView(document.getElementById('pageContainer')));
@@ -258,8 +265,7 @@ async function renderOvertimeView(content) {
 
 async function renderMonthlyView(content) {
   const [year, month] = currentMonth.split('-').map(Number);
-  const result = await api.getAttendance({ month: currentMonth, skipCache: true });
-  records = (result.data || []).map(normalizeRecord);
+  records = await loadMonthAttendance(currentMonth);
   const attMap = buildAttendanceMap(records);
 
   content.innerHTML = `
@@ -285,11 +291,13 @@ async function renderMonthlyView(content) {
   content.querySelector('#prevMonth').addEventListener('click', () => {
     const d = new Date(year, month - 2, 1);
     currentMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    monthCacheKey = null;
     renderView(document.getElementById('pageContainer'));
   });
   content.querySelector('#nextMonth').addEventListener('click', () => {
     const d = new Date(year, month, 1);
     currentMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    monthCacheKey = null;
     renderView(document.getElementById('pageContainer'));
   });
 }
@@ -307,14 +315,14 @@ async function renderTimelineView(content) {
   if (workerId) select.value = workerId;
 
   const loadTimeline = async () => {
-    const result = await api.getAttendance({ WorkerID: select.value, month: currentMonth, skipCache: true });
-    const items = (result.data || []).map(normalizeRecord);
+    const items = await loadMonthAttendance(currentMonth);
+    const filtered = items.filter(r => r.WorkerID === select.value);
     const list = content.querySelector('#timelineList');
-    if (!items.length) {
+    if (!filtered.length) {
       list.innerHTML = '<div class="empty-state"><p>No history</p></div>';
       return;
     }
-    list.innerHTML = items.map(r => {
+    list.innerHTML = filtered.map(r => {
       const status = (r.AttendanceStatus || '').toLowerCase();
       const color = status === 'overtime' ? 'var(--color-overtime)' :
         status === 'present' ? 'var(--color-present)' : 'var(--color-absent)';
@@ -455,6 +463,7 @@ function bindDelete(element, record, close) {
     if (!confirm('Delete this record?')) return;
     try {
       await api.deleteAttendance(record.AttendanceID);
+      clearMonthCache();
       showToast('Deleted', 'success');
       close();
       renderView(document.getElementById('pageContainer'));
@@ -484,6 +493,7 @@ function bindSave(element, record, isEdit, close, validateFn) {
         await api.markAttendance(data);
         showToast('Saved', 'success');
       }
+      clearMonthCache();
       close();
       renderView(document.getElementById('pageContainer'));
     } catch (e) {
