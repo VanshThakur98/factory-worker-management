@@ -1,5 +1,3 @@
-import { normalizeWorkerId } from './helpers.js';
-
 /** Shared payroll calculation — used by Payroll page, Dashboard, and Worker profile */
 
 export function getRateType(worker, settings) {
@@ -83,36 +81,18 @@ export function computeWorkerPay(attendanceRecords, worker, settings) {
   };
 }
 
-function resolvePayrollGroupKey(record, workerMap) {
-  const name = String(record.WorkerName || '').trim().toLowerCase();
-  if (name) {
-    const match = Object.values(workerMap).find(
-      w => String(w.WorkerName || '').trim().toLowerCase() === name
-    );
-    if (match) return normalizeWorkerId(match.WorkerID);
-  }
-  const id = normalizeWorkerId(record.WorkerID);
-  if (id && workerMap[id]) return id;
-  return null;
-}
-
 export function computePayrollFromAttendance(attendance, workers, settings) {
   const workerMap = {};
-  (workers || []).forEach(w => {
-    const id = normalizeWorkerId(w.WorkerID);
-    if (id) workerMap[id] = w;
-  });
+  (workers || []).forEach(w => { workerMap[w.WorkerID] = w; });
 
   const grouped = {};
   (attendance || []).forEach(a => {
-    const groupKey = resolvePayrollGroupKey(a, workerMap);
-    if (!groupKey) return;
-    if (!grouped[groupKey]) grouped[groupKey] = [];
-    grouped[groupKey].push(a);
+    if (!grouped[a.WorkerID]) grouped[a.WorkerID] = [];
+    grouped[a.WorkerID].push(a);
   });
 
   return Object.keys(grouped).map(id =>
-    computeWorkerPay(grouped[id], workerMap[id], settings)
+    computeWorkerPay(grouped[id], workerMap[id] || { WorkerID: id, WorkerName: 'Unknown', HourlyRate: 0 }, settings)
   ).sort((a, b) => b.TotalPay - a.TotalPay);
 }
 

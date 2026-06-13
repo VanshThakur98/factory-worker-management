@@ -1,5 +1,5 @@
 import { api } from '../services/api.js';
-import { formatCurrency, formatDisplayDate, getToday, getCurrentMonth, getMonthName, normalizeDate, normalizeWorkerId, getInitials } from '../utils/helpers.js';
+import { formatCurrency, formatDisplayDate, getToday, getCurrentMonth, getMonthName, normalizeDate, getInitials } from '../utils/helpers.js';
 import { computePayrollFromAttendance, getRateLabel } from '../utils/payroll.js';
 import { showToast } from '../components/toast.js';
 import { exportPayroll, exportPayrollPDF } from '../services/export.js';
@@ -105,14 +105,8 @@ async function loadPayroll(container) {
     let workers = allWorkers.length ? allWorkers : (await api.getWorkers({ status: 'Active' })).data || [];
 
     if (selectedWorkerId) {
-      const workerId = normalizeWorkerId(selectedWorkerId);
-      const worker = workers.find(w => normalizeWorkerId(w.WorkerID) === workerId);
-      const workerName = worker ? String(worker.WorkerName).trim().toLowerCase() : '';
-      attendance = attendance.filter(a => {
-        if (normalizeWorkerId(a.WorkerID) === workerId) return true;
-        return workerName && String(a.WorkerName).trim().toLowerCase() === workerName;
-      });
-      workers = workers.filter(w => normalizeWorkerId(w.WorkerID) === workerId);
+      attendance = attendance.filter(a => a.WorkerID === selectedWorkerId);
+      workers = workers.filter(w => w.WorkerID === selectedWorkerId);
     }
 
     payrollRecords = computePayrollFromAttendance(attendance, workers, settings);
@@ -219,13 +213,9 @@ function renderList(container, records, settings, attendance) {
 
   container.querySelectorAll('.payroll-earnings-row').forEach(row => {
     row.addEventListener('click', () => {
-      const r = records.find(rec => normalizeWorkerId(rec.WorkerID) === normalizeWorkerId(row.dataset.id));
+      const r = records.find(rec => rec.WorkerID === row.dataset.id);
       if (r) {
-        const workerName = String(r.WorkerName).trim().toLowerCase();
-        const workerAttendance = attendance.filter(a => {
-          if (normalizeWorkerId(a.WorkerID) === normalizeWorkerId(r.WorkerID)) return true;
-          return workerName && String(a.WorkerName).trim().toLowerCase() === workerName;
-        });
+        const workerAttendance = attendance.filter(a => a.WorkerID === r.WorkerID);
         showPayrollDetail(r, settings, workerAttendance);
       }
     });

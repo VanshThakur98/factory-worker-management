@@ -122,9 +122,3 @@ export function escapeHtml(str) {
 export function generateId(prefix) {
   return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 }
-
-/** Normalize worker IDs from sheets/API for reliable map lookups */
-export function normalizeWorkerId(id) {
-  if (id === null || id === undefined) return '';
-  return String(id).trim();
-}
