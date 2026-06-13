@@ -65,5 +65,15 @@ export const Storage = {
     if (!cached) return null;
     if (Date.now() - cached.timestamp > maxAge) return null;
     return cached.data;
+  },
+
+  clearCacheForAction(action) {
+    const prefix = `${PREFIX}cache_${action}_`;
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(prefix)) {
+        localStorage.removeItem(key);
+      }
+    }
   }
 };

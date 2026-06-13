@@ -71,6 +71,10 @@ class ApiService {
         return Storage.getCachedData(cacheKey, 86400000);
     }
 
+    invalidateActionCache(action) {
+        Storage.clearCacheForAction(action);
+    }
+
     isOffline() {
         return this.offline || !navigator.onLine;
     }

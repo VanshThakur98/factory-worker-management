@@ -73,6 +73,9 @@ async function renderDailyView(content) {
   const recordMap = {};
   records.forEach(r => { recordMap[r.WorkerID] = r; });
 
+  const markedCount = records.length;
+  const pendingCount = Math.max(workers.length - markedCount, 0);
+
   content.innerHTML = `
     <div class="card date-nav glass">
       <button class="icon-btn" id="prevDay"><span class="material-symbols-rounded">chevron_left</span></button>
@@ -82,7 +85,7 @@ async function renderDailyView(content) {
       </div>
       <button class="icon-btn" id="nextDay"><span class="material-symbols-rounded">chevron_right</span></button>
     </div>
-    <div class="section-title">${workers.length} workers · ${records.length} marked</div>
+    <div class="section-title">${workers.length} workers · ${markedCount} marked · ${pendingCount} pending</div>
     <div id="dailyList"></div>
   `;
 
@@ -111,22 +114,23 @@ function renderDailyList(list, recordMap) {
   list.innerHTML = workers.map(worker => {
     const record = recordMap[worker.WorkerID];
     const isMarked = !!record;
-    const status = record?.AttendanceStatus || 'Not Marked';
+    const status = (record && record.AttendanceStatus) || 'Not Marked';
     const badgeClass = isMarked ? statusBadgeClass(status) : 'badge-inactive';
     const detail = isMarked
       ? (record.TimeIn && record.TimeOut
-        ? `${record.TimeIn} → ${record.TimeOut} · ${record.WorkedHours}h`
+        ? `${record.TimeIn} → ${record.TimeOut} · ${record.WorkedHours || 0}h`
         : status)
       : 'Tap to mark attendance';
 
     return `
-      <div class="card attendance-worker-row" data-worker-id="${worker.WorkerID}">
-        <div class="worker-avatar small">${getInitials(worker.WorkerName)}</div>
+      <div class="card attendance-worker-row ${isMarked ? 'attendance-marked' : 'attendance-pending'}" data-worker-id="${worker.WorkerID}">
+        <div class="worker-avatar small ${isMarked ? 'marked' : ''}">${getInitials(worker.WorkerName)}</div>
         <div class="attendance-worker-info">
           <strong>${worker.WorkerName}</strong>
           <p>${detail}</p>
         </div>
         <div class="attendance-worker-actions">
+          ${isMarked ? '<span class="material-symbols-rounded attendance-check" title="Marked">check_circle</span>' : ''}
           <span class="badge ${badgeClass}">${status}</span>
           <button class="btn btn-sm ${isMarked ? 'btn-secondary' : 'btn-primary'}" data-mark="${worker.WorkerID}">
             ${isMarked ? 'Edit' : 'Mark'}
@@ -200,7 +204,7 @@ async function renderMonthlyView(content) {
 }
 
 async function renderTimelineView(content) {
-  const workerId = workers[0]?.WorkerID;
+  const workerId = workers[0] && workers[0].WorkerID;
   content.innerHTML = `
     <div class="form-group">
       <label>Select Worker</label>
@@ -249,43 +253,44 @@ async function renderTimelineView(content) {
 function showAttendanceForm(record = null, worker = null) {
   const isEdit = !!record;
   const settings = Storage.getSettings();
-  const workerId = worker?.WorkerID || record?.WorkerID || '';
-  const workerName = worker?.WorkerName || record?.WorkerName || '';
+  const workerId = (worker && worker.WorkerID) || (record && record.WorkerID) || '';
+  const workerName = (worker && worker.WorkerName) || (record && record.WorkerName) || '';
+  const defaultStatus = (record && record.AttendanceStatus) || 'Present';
 
   const { close, element } = showDialog({
     title: isEdit ? `Edit — ${workerName}` : `Mark — ${workerName}`,
     content: `
       <form id="attendanceForm">
         <input type="hidden" name="WorkerID" value="${workerId}">
-        <input type="hidden" name="Date" value="${record?.Date || currentDate}">
+        <input type="hidden" name="Date" value="${(record && record.Date) || currentDate}">
         <div class="form-group">
           <label>Date</label>
-          <input type="date" class="form-control" value="${record?.Date || currentDate}" disabled>
+          <input type="date" class="form-control" value="${(record && record.Date) || currentDate}" disabled>
         </div>
         <div class="form-group">
           <label>Status *</label>
           <select name="AttendanceStatus" class="form-control" id="attStatus">
-            <option value="Present" ${(record?.AttendanceStatus || '') === 'Present' ? 'selected' : ''}>Present</option>
-            <option value="Absent" ${record?.AttendanceStatus === 'Absent' ? 'selected' : ''}>Absent</option>
-            <option value="Leave" ${record?.AttendanceStatus === 'Leave' ? 'selected' : ''}>Leave</option>
-            <option value="Overtime" ${record?.AttendanceStatus === 'Overtime' ? 'selected' : ''}>Overtime</option>
+            <option value="Present" ${defaultStatus === 'Present' ? 'selected' : ''}>Present</option>
+            <option value="Absent" ${defaultStatus === 'Absent' ? 'selected' : ''}>Absent</option>
+            <option value="Leave" ${defaultStatus === 'Leave' ? 'selected' : ''}>Leave</option>
+            <option value="Overtime" ${defaultStatus === 'Overtime' ? 'selected' : ''}>Overtime</option>
           </select>
         </div>
-        <div id="overtimeFields" style="display:none">
-          <div class="section-title" style="margin:12px 0 8px">Overtime Details</div>
+        <div id="timeFields">
+          <div class="section-title" style="margin:12px 0 8px">Working Hours</div>
           <div class="form-row">
             <div class="form-group">
-              <label>Time In *</label>
-              <input type="time" name="TimeIn" class="form-control" value="${record?.TimeIn || '08:00'}">
+              <label>Time In</label>
+              <input type="time" name="TimeIn" class="form-control" value="${(record && record.TimeIn) || '08:00'}">
             </div>
             <div class="form-group">
-              <label>Time Out *</label>
-              <input type="time" name="TimeOut" class="form-control" value="${record?.TimeOut || '20:00'}">
+              <label>Time Out</label>
+              <input type="time" name="TimeOut" class="form-control" value="${(record && record.TimeOut) || '17:00'}">
             </div>
           </div>
           <div class="form-group">
             <label>Time Cut (minutes)</label>
-            <input type="number" name="TimeCut" class="form-control" min="0" value="${record?.TimeCut ?? 60}">
+            <input type="number" name="TimeCut" class="form-control" min="0" value="${(record && record.TimeCut != null) ? record.TimeCut : 60}">
           </div>
           <div id="hoursPreview" class="card" style="padding:12px;font-size:0.875rem"></div>
         </div>
@@ -299,22 +304,23 @@ function showAttendanceForm(record = null, worker = null) {
   });
 
   const form = element.querySelector('#attendanceForm');
-  const overtimeFields = element.querySelector('#overtimeFields');
+  const timeFields = element.querySelector('#timeFields');
   const hoursPreview = element.querySelector('#hoursPreview');
   const statusSelect = element.querySelector('#attStatus');
 
   const updateFields = () => {
     const status = statusSelect.value.toLowerCase();
-    if (status === 'overtime') {
-      overtimeFields.style.display = 'block';
+    const showTimes = status === 'present' || status === 'overtime';
+
+    timeFields.style.display = showTimes ? 'block' : 'none';
+
+    if (showTimes) {
       const data = getFormData(form);
       const hours = calculateHours(data, parseFloat(settings.regularHours) || 8);
       hoursPreview.innerHTML = `
         <strong>Calculated:</strong> ${hours.workedHours}h worked ·
         ${hours.regularHours}h regular · ${hours.overtimeHours}h overtime
       `;
-    } else {
-      overtimeFields.style.display = 'none';
     }
   };
 
@@ -330,6 +336,7 @@ function showAttendanceForm(record = null, worker = null) {
       if (!confirm('Delete this attendance record?')) return;
       try {
         await api.deleteAttendance(record.AttendanceID);
+        api.invalidateActionCache('getAttendance');
         showToast('Attendance deleted', 'success');
         close();
         renderView(document.getElementById('pageContainer'));
@@ -343,7 +350,7 @@ function showAttendanceForm(record = null, worker = null) {
     const data = getFormData(form);
     const status = data.AttendanceStatus.toLowerCase();
 
-    if (status !== 'overtime') {
+    if (status === 'absent' || status === 'leave') {
       data.TimeIn = '';
       data.TimeOut = '';
       data.TimeCut = 0;
@@ -363,6 +370,7 @@ function showAttendanceForm(record = null, worker = null) {
         await api.markAttendance(data);
         showToast('Attendance marked', 'success');
       }
+      api.invalidateActionCache('getAttendance');
       close();
       renderView(document.getElementById('pageContainer'));
     } catch (e) {

@@ -122,6 +122,25 @@
   cursor: pointer;
 }
 
+.attendance-worker-row.attendance-marked {
+  border-left: 4px solid var(--color-present);
+  background: rgba(52, 168, 83, 0.06);
+}
+
+.attendance-worker-row.attendance-pending {
+  border-left: 4px solid var(--md-sys-color-outline-variant);
+}
+
+.attendance-worker-row .worker-avatar.small.marked {
+  background: rgba(52, 168, 83, 0.2);
+  color: var(--color-present);
+}
+
+.attendance-check {
+  font-size: 20px;
+  color: var(--color-present);
+}
+
 .attendance-worker-row .worker-avatar.small {
   width: 40px;
   height: 40px;
