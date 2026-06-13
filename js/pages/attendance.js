@@ -8,6 +8,7 @@ import { renderCalendar, buildAttendanceMap } from '../components/calendar.js';
 import { renderTimePicker, initTimePickers } from '../components/time-picker.js';
 import { exportAttendance, exportAttendancePDF } from '../services/export.js';
 import { Storage } from '../services/storage.js';
+import { renderInlineLoader, showProcessing, hideProcessing } from '../components/loader.js';
 
 let records = [];
 let workers = [];
@@ -66,6 +67,47 @@ function splitDayRecords(dayRecords) {
   return { dailyMap, otByWorker, otList };
 }
 
+function getWorkerDaySummary(workerId, dayRecords) {
+  const { dailyMap, otByWorker } = splitDayRecords(dayRecords);
+  const present = dailyMap[workerId];
+  const otData = otByWorker[workerId];
+  const explicitOt = otData ? otData.hours : 0;
+  const regularHours = present ? (parseFloat(present.RegularHours) || parseFloat(present.WorkedHours) || 0) : 0;
+  const embeddedOt = present ? (parseFloat(present.OvertimeHours) || 0) : 0;
+  const totalOt = Math.round((embeddedOt + explicitOt) * 100) / 100;
+  const totalHours = Math.round((regularHours + totalOt) * 100) / 100;
+  return {
+    present,
+    explicitOtRecords: otData?.records || [],
+    regularHours,
+    embeddedOt,
+    explicitOt,
+    totalOt,
+    totalHours,
+    hasOvertime: totalOt > 0
+  };
+}
+
+function formatDayDetail(summary, record, status) {
+  if (!record) return 'Tap to mark';
+  const parts = [];
+  if (record.TimeIn && record.TimeOut) {
+    parts.push(`${record.TimeIn} → ${record.TimeOut}`);
+  }
+  if (summary.hasOvertime || summary.regularHours > 0) {
+    const hourParts = [];
+    if (summary.regularHours > 0) hourParts.push(`${summary.regularHours}h regular`);
+    if (summary.totalOt > 0) hourParts.push(`${summary.totalOt}h OT`);
+    hourParts.push(`${summary.totalHours}h total`);
+    parts.push(hourParts.join(' · '));
+  } else if (status.toLowerCase() !== 'absent') {
+    parts.push(`${record.WorkedHours || 0}h`);
+  } else {
+    parts.push(status);
+  }
+  return parts.join(' · ') || status;
+}
+
 export async function renderAttendance(container) {
   container.innerHTML = `
     <div class="tabs" id="viewTabs">
@@ -100,7 +142,7 @@ async function loadWorkers() {
 
 async function renderView(container) {
   const content = container.querySelector('#attendanceContent');
-  content.innerHTML = '<div class="spinner" style="margin:24px auto"></div>';
+  content.innerHTML = renderInlineLoader('Loading attendance...');
 
   try {
     if (viewMode === 'daily') await renderDailyView(content);
@@ -159,19 +201,21 @@ async function renderDailyView(content) {
 
   list.innerHTML = workers.map(worker => {
     const record = dailyMap[worker.WorkerID];
+    const summary = getWorkerDaySummary(worker.WorkerID, dayRecords);
     const isMarked = !!record;
     const status = (record && record.AttendanceStatus) || 'Not Marked';
     const badgeClass = isMarked ? statusBadgeClass(status) : 'badge-inactive';
-    const detail = isMarked
-      ? (record.TimeIn && record.TimeOut ? `${record.TimeIn} → ${record.TimeOut} · ${record.WorkedHours || 0}h` : status)
-      : 'Tap to mark';
+    const detail = formatDayDetail(summary, record, status);
+    const otBadge = summary.hasOvertime
+      ? `<span class="attendance-ot-badge">${summary.totalOt}h OT</span>`
+      : '';
 
     return `
       <div class="card attendance-worker-row ${isMarked ? 'attendance-marked' : 'attendance-pending'}" data-worker-id="${worker.WorkerID}">
         <div class="worker-avatar small ${isMarked ? 'marked' : ''}">${getInitials(worker.WorkerName)}</div>
         <div class="attendance-worker-info">
           <strong>${worker.WorkerName}</strong>
-          <p>${detail}</p>
+          <p>${detail}${otBadge}</p>
         </div>
         <div class="attendance-worker-actions">
           ${isMarked ? '<span class="material-symbols-rounded attendance-check">check_circle</span>' : ''}
@@ -326,12 +370,20 @@ async function renderTimelineView(content) {
       const status = (r.AttendanceStatus || '').toLowerCase();
       const color = status === 'overtime' ? 'var(--color-overtime)' :
         status === 'present' ? 'var(--color-present)' : 'var(--color-absent)';
+      const otHours = parseFloat(r.OvertimeHours) || 0;
+      const regularHours = parseFloat(r.RegularHours) || 0;
+      let hoursDetail = `${r.WorkedHours}h total`;
+      if (status === 'present' && otHours > 0) {
+        hoursDetail = `${regularHours}h regular · ${otHours}h OT · ${r.WorkedHours}h total`;
+      } else if (status === 'overtime') {
+        hoursDetail = `${otHours || r.WorkedHours}h OT`;
+      }
       return `
         <div class="timeline-item">
           <div class="timeline-marker" style="background:${color}22;color:${color}"><span class="material-symbols-rounded" style="font-size:16px">schedule</span></div>
           <div class="timeline-content">
             <h4>${formatDisplayDate(r.Date)} — ${r.AttendanceStatus}</h4>
-            <p>${r.TimeIn || '-'} to ${r.TimeOut || '-'} · ${r.WorkedHours}h${parseFloat(r.OvertimeHours) > 0 ? ` · ${r.OvertimeHours}h OT` : ''}</p>
+            <p>${r.TimeIn || '-'} to ${r.TimeOut || '-'} · ${hoursDetail}</p>
           </div>
         </div>`;
     }).join('');
@@ -485,6 +537,7 @@ function bindSave(element, record, isEdit, close, validateFn) {
     }
     const saveBtn = element.querySelector('#saveAttendance');
     saveBtn.disabled = true;
+    showProcessing(isEdit ? 'Updating attendance...' : 'Saving attendance...');
     try {
       if (isEdit) {
         await api.updateAttendance({ ...data, AttendanceID: record.AttendanceID });
@@ -499,6 +552,7 @@ function bindSave(element, record, isEdit, close, validateFn) {
     } catch (e) {
       showToast(e.message || 'Save failed', 'error');
     } finally {
+      hideProcessing();
       saveBtn.disabled = false;
     }
   });

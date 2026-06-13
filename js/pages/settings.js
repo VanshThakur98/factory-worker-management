@@ -3,9 +3,20 @@ import { Storage } from '../services/storage.js';
 import { showToast } from '../components/toast.js';
 import { isValidUrl } from '../utils/validators.js';
 import { escapeHtml } from '../utils/helpers.js';
+import { showProcessing, hideProcessing } from '../components/loader.js';
 
 export async function renderSettings(container) {
-  const settings = Storage.getSettings();
+  showProcessing('Loading settings...');
+  let settings = Storage.getSettings();
+
+  try {
+    const result = await api.getSettings();
+    if (result.data) settings = Storage.syncSettingsFromApi(result.data);
+  } catch {
+    // use local settings
+  } finally {
+    hideProcessing();
+  }
   const apiUrl = Storage.getApiUrl();
   const apiHardcoded = Storage.isApiUrlHardcoded();
   let connected = false;
@@ -138,6 +149,7 @@ export async function renderSettings(container) {
     Storage.setSettings(newSettings);
 
     try {
+      showProcessing('Saving settings...');
       await api.updateSettings({
         CompanyName: newSettings.companyName,
         RegularHours: String(newSettings.regularHours),
@@ -147,6 +159,8 @@ export async function renderSettings(container) {
       showToast('Settings saved', 'success');
     } catch {
       showToast('Settings saved locally', 'info');
+    } finally {
+      hideProcessing();
     }
   });
 

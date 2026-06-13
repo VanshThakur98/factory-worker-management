@@ -3,6 +3,7 @@ import { formatCurrency, formatDisplayDate, getToday, getMonthName, normalizeDat
 import { computePayrollFromAttendance } from '../utils/payroll.js';
 import { renderAttendanceChart, renderPayrollChart, destroyAllCharts } from '../components/charts.js';
 import { Storage } from '../services/storage.js';
+import { renderProcessingBlock } from '../components/loader.js';
 
 let selectedDate = getToday();
 
@@ -47,7 +48,7 @@ async function loadDashboardData(container, settings) {
   const dateLabel = formatDisplayDate(selectedDate);
 
   container.querySelector('#statGrid').innerHTML = renderStatSkeleton(dateLabel);
-  container.querySelector('#recentActivity').innerHTML = '<div class="spinner" style="margin:16px auto"></div>';
+  container.querySelector('#recentActivity').innerHTML = renderProcessingBlock('Loading activity...');
 
   try {
     const [attResult, workersResult] = await Promise.all([

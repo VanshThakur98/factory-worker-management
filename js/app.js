@@ -7,6 +7,8 @@ import { renderSettings } from './pages/settings.js';
 import { destroyAllCharts } from './components/charts.js';
 import { showToast } from './components/toast.js';
 import { api } from './services/api.js';
+import { Storage } from './services/storage.js';
+import { showProcessing, hideProcessing } from './components/loader.js';
 
 const PAGE_TITLES = {
   dashboard: { title: 'Dashboard', subtitle: 'Overview & Statistics' },
@@ -29,6 +31,15 @@ const pages = {
   settings: renderSettings
 };
 
+const PAGE_LOAD_MESSAGES = {
+  dashboard: 'Loading dashboard...',
+  workers: 'Loading workers...',
+  attendance: 'Loading attendance...',
+  payroll: 'Loading payroll...',
+  reports: 'Loading reports...',
+  settings: 'Loading settings...'
+};
+
 async function navigateTo(page) {
   if (!pages[page]) return;
 
@@ -47,7 +58,7 @@ async function navigateTo(page) {
 
   const container = document.getElementById('pageContainer');
   container.innerHTML = '';
-  showLoading(true);
+  showProcessing(PAGE_LOAD_MESSAGES[page] || 'Loading...');
 
   try {
     await pages[page](container);
@@ -61,7 +72,7 @@ async function navigateTo(page) {
       </div>
     `;
   } finally {
-    showLoading(false);
+    hideProcessing();
     updateOfflineBanner();
   }
 
@@ -69,7 +80,8 @@ async function navigateTo(page) {
 }
 
 function showLoading(show) {
-  document.getElementById('loadingOverlay').classList.toggle('hidden', !show);
+  if (show) showProcessing('Loading...');
+  else hideProcessing();
 }
 
 function updateOfflineBanner() {
@@ -197,9 +209,15 @@ function getInitialPage() {
   return pages[page] ? page : 'dashboard';
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   closeMoreSheet();
   setupNavigation();
   setupPWA();
+  try {
+    const result = await api.getSettings();
+    if (result.data) Storage.syncSettingsFromApi(result.data);
+  } catch {
+    // use cached settings
+  }
   navigateTo(getInitialPage());
 });

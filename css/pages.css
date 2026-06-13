@@ -282,6 +282,119 @@
   color: var(--md-sys-color-on-surface-variant);
 }
 
+.payroll-breakdown {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 0.75rem;
+}
+
+.payroll-breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.payroll-breakdown-row.normal { color: var(--md-sys-color-on-surface); }
+.payroll-breakdown-row.overtime { color: var(--color-overtime); }
+.payroll-breakdown-row.total {
+  border-top: 1px solid var(--glass-border);
+  padding-top: 10px;
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+.payroll-detail-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.payroll-detail-section {
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--md-sys-color-surface-container);
+}
+
+.payroll-detail-section.overtime {
+  border-left: 3px solid var(--color-overtime);
+}
+
+.payroll-detail-section.normal {
+  border-left: 3px solid var(--color-present);
+}
+
+.payroll-detail-section.total {
+  background: var(--md-sys-color-primary-container);
+}
+
+/* Worker profile */
+.worker-profile-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.worker-profile-header .worker-avatar {
+  width: 56px;
+  height: 56px;
+  font-size: 1.25rem;
+}
+
+.worker-profile-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.worker-stat-card {
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--md-sys-color-surface-container);
+  text-align: center;
+}
+
+.worker-stat-card .stat-value {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--md-sys-color-primary);
+}
+
+.worker-stat-card .stat-label {
+  font-size: 0.6875rem;
+  color: var(--md-sys-color-on-surface-variant);
+  margin-top: 4px;
+}
+
+.worker-stat-card.overtime .stat-value { color: var(--color-overtime); }
+
+.worker-ot-records {
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.worker-ot-record {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--glass-border);
+  font-size: 0.8125rem;
+}
+
+.worker-ot-record:last-child { border-bottom: none; }
+
+.attendance-ot-badge {
+  display: inline-block;
+  font-size: 0.6875rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(124, 77, 255, 0.15);
+  color: var(--color-overtime);
+  margin-left: 4px;
+}
+
 /* Leaves page */
 .leave-balance-grid {
   display: grid;

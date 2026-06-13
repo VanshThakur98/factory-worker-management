@@ -5,6 +5,7 @@ import { showToast } from '../components/toast.js';
 import { exportPayroll, exportPayrollPDF } from '../services/export.js';
 import { Storage } from '../services/storage.js';
 import { showDialog } from '../components/dialog.js';
+import { renderProcessingBlock, showProcessing, hideProcessing } from '../components/loader.js';
 
 let payrollRecords = [];
 let allWorkers = [];
@@ -46,10 +47,13 @@ export async function renderPayroll(container) {
 function bindEvents(container) {
   container.querySelector('#generatePayroll').addEventListener('click', async () => {
     try {
+      showProcessing('Saving payroll...');
       await api.generatePayroll(getCurrentMonth());
       showToast('Payroll saved for ' + getMonthName(getCurrentMonth()), 'success');
     } catch (e) {
       showToast(e.message, 'error');
+    } finally {
+      hideProcessing();
     }
   });
 
@@ -84,7 +88,7 @@ async function loadWorkersList(container) {
 async function loadPayroll(container) {
   const dashboard = container.querySelector('#payrollDashboard');
   const list = container.querySelector('#payrollList');
-  dashboard.innerHTML = '<div class="spinner" style="margin:24px auto"></div>';
+  dashboard.innerHTML = renderProcessingBlock('Calculating payroll...');
   list.innerHTML = '';
 
   if (fromDate > toDate) {
@@ -117,23 +121,24 @@ function renderDashboard(container, records, settings) {
   const total = records.reduce((s, r) => s + (parseFloat(r.TotalPay) || 0), 0);
   const otCost = records.reduce((s, r) => s + (parseFloat(r.OvertimePay) || 0), 0);
   const regCost = records.reduce((s, r) => s + (parseFloat(r.RegularPay) || 0), 0);
+  const regHours = records.reduce((s, r) => s + (parseFloat(r.RegularHours) || 0), 0);
+  const otHours = records.reduce((s, r) => s + (parseFloat(r.OvertimeHours) || 0), 0);
   const highest = records.reduce((max, r) => (!max || r.TotalPay > max.TotalPay) ? r : max, null);
   const rangeLabel = `${formatDisplayDate(fromDate)} – ${formatDisplayDate(toDate)}`;
-
   container.innerHTML = `
     <div class="section-title" style="margin-bottom:8px">${rangeLabel}${selectedWorkerId ? ' · ' + (records[0]?.WorkerName || 'Worker') : ''}</div>
     <div class="payroll-summary">
       <div class="card payroll-card highlight">
         <div class="amount">${formatCurrency(total, settings.currency)}</div>
-        <div class="label">Total Earned</div>
+        <div class="label">Combined Total</div>
       </div>
       <div class="card payroll-card">
         <div class="amount">${formatCurrency(regCost, settings.currency)}</div>
-        <div class="label">Regular Pay</div>
+        <div class="label">Normal Pay · ${regHours.toFixed(1)}h</div>
       </div>
       <div class="card payroll-card">
-        <div class="amount">${formatCurrency(otCost, settings.currency)}</div>
-        <div class="label">Overtime Pay</div>
+        <div class="amount" style="color:var(--color-overtime)">${formatCurrency(otCost, settings.currency)}</div>
+        <div class="label">Overtime Pay · ${otHours.toFixed(1)}h</div>
       </div>
       <div class="card payroll-card">
         <div class="amount" style="font-size:1rem">${highest ? highest.WorkerName : '-'}</div>
@@ -155,11 +160,21 @@ function renderList(container, records, settings, attendance) {
         <div class="payroll-worker-row" data-id="${r.WorkerID}">
           <div class="payroll-worker-info">
             <h4>${r.WorkerName}</h4>
-            <p>${r.TotalHours || 0}h · ${r.OvertimeHours || 0}h OT · ${formatCurrency(r.HourlyRate, settings.currency)}${getRateLabel(r.RateType)}</p>
-          </div>
-          <div class="payroll-amount">
-            <strong>${formatCurrency(r.TotalPay, settings.currency)}</strong>
-            <span>Reg ${formatCurrency(r.RegularPay, settings.currency)} + OT ${formatCurrency(r.OvertimePay, settings.currency)}</span>
+            <div class="payroll-breakdown">
+              <div class="payroll-breakdown-row normal">
+                <span>Normal: ${r.RegularHours || 0}h</span>
+                <span>${formatCurrency(r.RegularPay, settings.currency)}</span>
+              </div>
+              <div class="payroll-breakdown-row overtime">
+                <span>Overtime: ${r.OvertimeHours || 0}h</span>
+                <span>${formatCurrency(r.OvertimePay, settings.currency)}</span>
+              </div>
+              <div class="payroll-breakdown-row total">
+                <span>Total (${r.PresentDays || 0} days)</span>
+                <span>${formatCurrency(r.TotalPay, settings.currency)}</span>
+              </div>
+            </div>
+            <p style="margin-top:6px">${formatCurrency(r.HourlyRate, settings.currency)}${getRateLabel(r.RateType)}</p>
           </div>
         </div>`).join('')}
     </div>`;
@@ -195,9 +210,16 @@ function showPayrollDetail(record, settings, attendance) {
     .sort((a, b) => String(a.Date).localeCompare(String(b.Date)))
     .map(a => {
       const s = String(a.AttendanceStatus || '').toLowerCase();
-      const hours = s === 'overtime'
-        ? `${a.OvertimeHours || a.WorkedHours || 0}h OT`
-        : `${a.WorkedHours || 0}h`;
+      let hours;
+      if (s === 'overtime') {
+        hours = `${a.OvertimeHours || a.WorkedHours || 0}h OT`;
+      } else {
+        const ot = parseFloat(a.OvertimeHours) || 0;
+        const reg = parseFloat(a.RegularHours) || 0;
+        hours = ot > 0
+          ? `${reg}h regular · ${ot}h OT · ${a.WorkedHours || 0}h total`
+          : `${a.WorkedHours || 0}h`;
+      }
       return `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--md-sys-color-outline-variant)">
         <span>${formatDisplayDate(a.Date)} · ${a.AttendanceStatus}</span>
         <span>${a.TimeIn || '-'} – ${a.TimeOut || '-'} · ${hours}</span>
@@ -207,15 +229,23 @@ function showPayrollDetail(record, settings, attendance) {
   showDialog({
     title: record.WorkerName,
     content: `
-      <div style="display:grid;gap:12px">
+      <div class="payroll-detail-grid">
         <div class="card" style="padding:12px"><strong>Period:</strong> ${formatDisplayDate(fromDate)} – ${formatDisplayDate(toDate)}</div>
         <div class="card" style="padding:12px"><strong>Rate:</strong> ${formatCurrency(record.HourlyRate, settings.currency)}${getRateLabel(record.RateType)}</div>
-        <div class="card" style="padding:12px"><strong>Total Hours:</strong> ${record.TotalHours}h (${record.PresentDays || 0} present days)</div>
-        <div class="card" style="padding:12px"><strong>Overtime Hours:</strong> ${record.OvertimeHours}h</div>
-        <div class="card" style="padding:12px"><strong>Regular Pay:</strong> ${formatCurrency(record.RegularPay, settings.currency)}</div>
-        <div class="card" style="padding:12px"><strong>Overtime Pay:</strong> ${formatCurrency(record.OvertimePay, settings.currency)}</div>
-        <div class="card" style="padding:12px;background:var(--md-sys-color-primary-container)">
-          <strong>Total Earned:</strong> ${formatCurrency(record.TotalPay, settings.currency)}
+        <div class="payroll-detail-section normal">
+          <strong>Normal Working</strong>
+          <p>${record.RegularHours || 0}h · ${record.PresentDays || 0} days</p>
+          <p style="font-size:1.125rem;font-weight:600;margin-top:4px">${formatCurrency(record.RegularPay, settings.currency)}</p>
+        </div>
+        <div class="payroll-detail-section overtime">
+          <strong>Overtime</strong>
+          <p>${record.OvertimeHours || 0}h · ${record.OvertimeDays || 0} OT days</p>
+          <p style="font-size:1.125rem;font-weight:600;margin-top:4px;color:var(--color-overtime)">${formatCurrency(record.OvertimePay, settings.currency)}</p>
+        </div>
+        <div class="payroll-detail-section total">
+          <strong>Combined Total</strong>
+          <p>${record.TotalHours || 0}h total worked</p>
+          <p style="font-size:1.25rem;font-weight:700;margin-top:4px">${formatCurrency(record.TotalPay, settings.currency)}</p>
         </div>
         <div class="section-title">Day-by-day</div>
         <div class="card" style="padding:12px;max-height:200px;overflow-y:auto">${dayRows}</div>

@@ -39,9 +39,11 @@
     </header>
 
     <main id="mainContent" class="main-content">
-      <div id="loadingOverlay" class="loading-overlay hidden">
-        <div class="spinner"></div>
-        <p>Loading...</p>
+      <div id="loadingOverlay" class="loading-overlay hidden" aria-busy="false">
+        <div class="loader-ring">
+          <div class="loader-ring-inner"></div>
+        </div>
+        <p class="loading-message">Loading...</p>
       </div>
       <div id="offlineBanner" class="offline-banner hidden">
         <span class="material-symbols-rounded">cloud_off</span>

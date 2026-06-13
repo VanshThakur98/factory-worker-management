@@ -52,6 +52,19 @@ export const Storage = {
     });
   },
 
+  syncSettingsFromApi(apiData) {
+    if (!apiData) return this.getSettings();
+    const current = this.getSettings();
+    const synced = {
+      companyName: apiData.CompanyName || current.companyName,
+      regularHours: parseFloat(apiData.RegularHours) || current.regularHours,
+      currency: apiData.Currency || current.currency,
+      defaultRateType: apiData.DefaultRateType || current.defaultRateType
+    };
+    this.setSettings(synced);
+    return synced;
+  },
+
   setSettings(settings) {
     this.set('settings', settings);
   },

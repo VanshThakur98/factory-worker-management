@@ -1,11 +1,12 @@
 import { api } from '../services/api.js';
-import { formatCurrency, getInitials, debounce, statusBadgeClass } from '../utils/helpers.js';
-import { getRateLabel } from '../utils/payroll.js';
+import { formatCurrency, getInitials, debounce, statusBadgeClass, formatDisplayDate, getCurrentMonth, getMonthName, normalizeDate } from '../utils/helpers.js';
+import { getRateLabel, computeWorkerPay } from '../utils/payroll.js';
 import { validateWorker } from '../utils/validators.js';
 import { showDialog, getFormData, showFormErrors } from '../components/dialog.js';
 import { showToast } from '../components/toast.js';
 import { exportWorkers } from '../services/export.js';
 import { Storage } from '../services/storage.js';
+import { renderInlineLoader, renderProcessingBlock, showProcessing, hideProcessing } from '../components/loader.js';
 
 let workers = [];
 let viewMode = 'cards';
@@ -79,7 +80,7 @@ function bindEvents(container) {
 
 async function loadWorkers(container) {
   const list = container.querySelector('#workersList');
-  list.innerHTML = '<div class="spinner" style="margin:24px auto"></div>';
+  list.innerHTML = renderInlineLoader('Loading workers...');
 
   try {
     const search = container.querySelector('#workerSearch').value;
@@ -166,9 +167,20 @@ function renderWorkersList(container) {
   });
 
   list.querySelectorAll('.worker-card').forEach(card => {
-    card.addEventListener('click', () => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('[data-action]')) return;
       const worker = workers.find(w => w.WorkerID === card.dataset.id);
-      if (worker) showWorkerForm(worker);
+      if (worker) showWorkerProfile(worker);
+    });
+  });
+
+  list.querySelectorAll('.data-table tbody tr').forEach(row => {
+    row.style.cursor = 'pointer';
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('[data-action]')) return;
+      const id = row.querySelector('[data-id]')?.dataset.id;
+      const worker = workers.find(w => w.WorkerID === id);
+      if (worker) showWorkerProfile(worker);
     });
   });
 }
@@ -204,6 +216,98 @@ async function handleAction(action, workerId, container) {
         }
       }
       break;
+  }
+}
+
+async function showWorkerProfile(worker) {
+  const settings = Storage.getSettings();
+  const profileMonth = getCurrentMonth();
+  const startDate = profileMonth + '-01';
+  const endDate = profileMonth + '-31';
+
+  const { close, element } = showDialog({
+    title: 'Worker Profile',
+    content: renderProcessingBlock('Loading profile...'),
+    footer: `
+      <button class="btn btn-secondary" id="editWorkerProfile">Edit</button>
+      <button class="btn btn-primary dialog-cancel">Close</button>`
+  });
+
+  element.querySelector('.dialog-cancel').addEventListener('click', close);
+  element.querySelector('#editWorkerProfile').addEventListener('click', () => {
+    close();
+    showWorkerForm(worker);
+  });
+
+  try {
+    const attResult = await api.getAttendance({ WorkerID: worker.WorkerID, startDate, endDate });
+    const attendance = (attResult.data || []).map(r => ({ ...r, Date: normalizeDate(r.Date) }));
+    const pay = computeWorkerPay(attendance, worker, settings);
+
+    const otRecordsHtml = pay.OvertimeRecords.length
+      ? pay.OvertimeRecords.map(r => {
+          const otH = parseFloat(r.OvertimeHours) || parseFloat(r.WorkedHours) || 0;
+          const label = r._embeddedOt ? 'Embedded OT' : 'Overtime entry';
+          return `
+            <div class="worker-ot-record">
+              <span>${formatDisplayDate(r.Date)} · ${label}</span>
+              <span>${r.TimeIn || '-'} – ${r.TimeOut || '-'} · ${otH}h</span>
+            </div>`;
+        }).join('')
+      : '<p style="color:var(--md-sys-color-on-surface-variant);font-size:0.8125rem;padding:8px 0">No overtime records this month</p>';
+
+    const body = element.querySelector('.dialog-body');
+    if (body) {
+      body.innerHTML = `
+        <div class="worker-profile-header">
+          <div class="worker-avatar">${getInitials(worker.WorkerName)}</div>
+          <div>
+            <h3 style="margin:0">${worker.WorkerName}</h3>
+            <p style="font-size:0.8125rem;color:var(--md-sys-color-on-surface-variant);margin:4px 0 0">
+              ${worker.Phone || 'No phone'} · ${worker.Status} · Joined ${worker.JoinDate || '-'}
+            </p>
+            <p style="font-size:0.8125rem;margin-top:4px">
+              ${formatCurrency(worker.HourlyRate, settings.currency)}${getRateLabel(worker.RateType || 'hour')}
+            </p>
+          </div>
+        </div>
+        <div class="section-title">${getMonthName(profileMonth)} Summary</div>
+        <div class="worker-profile-stats">
+          <div class="worker-stat-card">
+            <div class="stat-value">${pay.RegularHours}h</div>
+            <div class="stat-label">Normal Hours</div>
+          </div>
+          <div class="worker-stat-card overtime">
+            <div class="stat-value">${pay.OvertimeHours}h</div>
+            <div class="stat-label">Overtime Hours</div>
+          </div>
+          <div class="worker-stat-card">
+            <div class="stat-value">${pay.PresentDays}</div>
+            <div class="stat-label">Normal Days</div>
+          </div>
+          <div class="worker-stat-card overtime">
+            <div class="stat-value">${pay.OvertimeDays || 0}</div>
+            <div class="stat-label">OT Days</div>
+          </div>
+          <div class="worker-stat-card">
+            <div class="stat-value">${formatCurrency(pay.RegularPay, settings.currency)}</div>
+            <div class="stat-label">Normal Earnings</div>
+          </div>
+          <div class="worker-stat-card overtime">
+            <div class="stat-value">${formatCurrency(pay.OvertimePay, settings.currency)}</div>
+            <div class="stat-label">Overtime Earnings</div>
+          </div>
+        </div>
+        <div class="card" style="padding:14px;background:var(--md-sys-color-primary-container);margin-bottom:16px;text-align:center">
+          <div style="font-size:0.75rem;color:var(--md-sys-color-on-surface-variant)">Total Payment</div>
+          <div style="font-size:1.5rem;font-weight:700;margin-top:4px">${formatCurrency(pay.TotalPay, settings.currency)}</div>
+        </div>
+        <div class="section-title">Overtime Records</div>
+        <div class="card worker-ot-records" style="padding:12px">${otRecordsHtml}</div>`;
+    }
+  } catch (e) {
+    const body = element.querySelector('.dialog-body');
+    if (body) body.innerHTML = `<div class="empty-state"><p>${e.message}</p></div>`;
   }
 }
 
@@ -288,6 +392,7 @@ function showWorkerForm(worker = null) {
     }
 
     try {
+      showProcessing(isEdit ? 'Updating worker...' : 'Adding worker...');
       if (isEdit) {
         await api.updateWorker({ ...data, WorkerID: worker.WorkerID });
         showToast('Worker updated', 'success');
@@ -300,6 +405,8 @@ function showWorkerForm(worker = null) {
       await loadWorkers(container);
     } catch (e) {
       showToast(e.message, 'error');
+    } finally {
+      hideProcessing();
     }
   });
 }

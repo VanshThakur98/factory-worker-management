@@ -1,4 +1,4 @@
-/** Shared payroll calculation — used by Payroll page and Dashboard */
+/** Shared payroll calculation — used by Payroll page, Dashboard, and Worker profile */
 
 export function getRateType(worker, settings) {
   return (worker.RateType || worker.rateType || settings.defaultRateType || 'hour').toLowerCase();
@@ -18,14 +18,25 @@ export function computeWorkerPay(attendanceRecords, worker, settings) {
   let totalRegular = 0;
   let totalOvertime = 0;
   let presentDays = 0;
+  let overtimeDays = 0;
+  const overtimeRecords = [];
 
   (attendanceRecords || []).forEach(a => {
     const status = String(a.AttendanceStatus || '').toLowerCase();
     if (status === 'overtime') {
-      totalOvertime += parseFloat(a.OvertimeHours) || parseFloat(a.WorkedHours) || 0;
+      const otHours = parseFloat(a.OvertimeHours) || parseFloat(a.WorkedHours) || 0;
+      totalOvertime += otHours;
       totalWorked += parseFloat(a.WorkedHours) || 0;
+      overtimeDays++;
+      overtimeRecords.push(a);
     } else if (status === 'present' || status === 'half day') {
       totalRegular += parseFloat(a.RegularHours) || parseFloat(a.WorkedHours) || 0;
+      const embeddedOt = parseFloat(a.OvertimeHours) || 0;
+      if (embeddedOt > 0) {
+        totalOvertime += embeddedOt;
+        overtimeDays++;
+        overtimeRecords.push({ ...a, _embeddedOt: true });
+      }
       totalWorked += parseFloat(a.WorkedHours) || 0;
       presentDays++;
     }
@@ -60,6 +71,8 @@ export function computeWorkerPay(attendanceRecords, worker, settings) {
     RegularHours: totalRegular,
     OvertimeHours: totalOvertime,
     PresentDays: presentDays,
+    OvertimeDays: overtimeDays,
+    OvertimeRecords: overtimeRecords,
     HourlyRate: rate,
     RateType: rateType,
     RegularPay: regularPay,
