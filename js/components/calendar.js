@@ -60,7 +60,8 @@ export function renderCalendar(container, year, month, attendanceMap, onDateClic
 export function buildAttendanceMap(records) {
   const map = {};
   records.forEach(r => {
-    const date = r.Date;
+    const date = String(r.Date || '').substring(0, 10);
+    if (!date) return;
     if (!map[date]) {
       map[date] = { status: r.AttendanceStatus, overtime: 0, records: [] };
     }

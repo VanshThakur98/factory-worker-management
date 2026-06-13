@@ -2,7 +2,7 @@ import { Storage } from './storage.js';
 
 class ApiService {
     constructor() {
-        this.baseUrl = 'https://script.google.com/macros/s/AKfycbz245KUaw5bAWR46q1P8j1UGCfYXuIj-KfsCn1YnCKqSD3BB0GQ4jO_j6PIgzk3rYv45A/exec';
+        this.baseUrl = Storage.getApiUrl() || '';
         this.offline = false;
     }
 
@@ -29,7 +29,8 @@ class ApiService {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify(payload),
-                mode: 'cors'
+                mode: 'cors',
+                cache: options.skipCache ? 'no-store' : 'default'
             });
 
             if (!response.ok) {
@@ -43,13 +44,17 @@ class ApiService {
             }
 
             this.offline = false;
-            this.cacheResult(action, result, data);
+            if (!options.skipCache) {
+                this.cacheResult(action, result, data);
+            }
             return result;
         } catch (error) {
-            const cached = this.getCachedResult(action, data);
-            if (cached) {
-                this.offline = true;
-                return {...cached, offline: true };
+            if (!options.skipCache) {
+                const cached = this.getCachedResult(action, data);
+                if (cached) {
+                    this.offline = true;
+                    return { ...cached, offline: true };
+                }
             }
 
             if (options.allowOffline) {
@@ -104,19 +109,26 @@ class ApiService {
     }
 
     async getAttendance(params = {}) {
-        return this.request('getAttendance', params);
+        const { skipCache, ...query } = params;
+        return this.request('getAttendance', query, { skipCache });
     }
 
     async markAttendance(data) {
-        return this.request('markAttendance', { data });
+        const result = await this.request('markAttendance', { data });
+        this.invalidateActionCache('getAttendance');
+        return result;
     }
 
     async updateAttendance(data) {
-        return this.request('updateAttendance', { data });
+        const result = await this.request('updateAttendance', { data });
+        this.invalidateActionCache('getAttendance');
+        return result;
     }
 
     async deleteAttendance(attendanceId) {
-        return this.request('deleteAttendance', { data: { AttendanceID: attendanceId } });
+        const result = await this.request('deleteAttendance', { data: { AttendanceID: attendanceId } });
+        this.invalidateActionCache('getAttendance');
+        return result;
     }
 
     async getLeaves(params = {}) {

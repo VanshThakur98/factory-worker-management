@@ -1,5 +1,5 @@
 import { api } from '../services/api.js';
-import { formatDisplayDate, getToday, getCurrentMonth, getMonthName, addDays, statusBadgeClass, getInitials } from '../utils/helpers.js';
+import { formatDisplayDate, getToday, getCurrentMonth, getMonthName, addDays, statusBadgeClass, getInitials, normalizeDate, normalizeTime } from '../utils/helpers.js';
 import { validateAttendance } from '../utils/validators.js';
 import { calculateHours } from '../utils/hours.js';
 import { showDialog, getFormData, showFormErrors } from '../components/dialog.js';
@@ -13,6 +13,31 @@ let workers = [];
 let currentDate = getToday();
 let currentMonth = getCurrentMonth();
 let viewMode = 'daily';
+
+function normalizeRecord(record) {
+  if (!record) return record;
+  return {
+    ...record,
+    Date: normalizeDate(record.Date),
+    TimeIn: normalizeTime(record.TimeIn),
+    TimeOut: normalizeTime(record.TimeOut)
+  };
+}
+
+async function loadAttendanceForDate(date) {
+  const month = date.substring(0, 7);
+  const result = await api.getAttendance({ month, skipCache: true });
+  const allRecords = (result.data || []).map(normalizeRecord);
+  return allRecords.filter(r => normalizeDate(r.Date) === date);
+}
+
+function buildRecordMap(attendanceRecords) {
+  const recordMap = {};
+  attendanceRecords.forEach(r => {
+    recordMap[r.WorkerID] = r;
+  });
+  return recordMap;
+}
 
 export async function renderAttendance(container) {
   container.innerHTML = `
@@ -63,15 +88,14 @@ async function renderView(container) {
 }
 
 async function renderDailyView(content) {
-  const [attResult, workersResult] = await Promise.all([
-    api.getAttendance({ Date: currentDate }),
+  const [attRecords, workersResult] = await Promise.all([
+    loadAttendanceForDate(currentDate),
     api.getWorkers({ status: 'Active' })
   ]);
-  records = attResult.data || [];
+  records = attRecords;
   workers = workersResult.data || [];
 
-  const recordMap = {};
-  records.forEach(r => { recordMap[r.WorkerID] = r; });
+  const recordMap = buildRecordMap(records);
 
   const markedCount = records.length;
   const pendingCount = Math.max(workers.length - markedCount, 0);
@@ -161,8 +185,8 @@ function renderDailyList(list, recordMap) {
 
 async function renderMonthlyView(content) {
   const [year, month] = currentMonth.split('-').map(Number);
-  const result = await api.getAttendance({ month: currentMonth });
-  records = result.data || [];
+  const result = await api.getAttendance({ month: currentMonth, skipCache: true });
+  records = (result.data || []).map(normalizeRecord);
   const attMap = buildAttendanceMap(records);
 
   content.innerHTML = `
@@ -219,8 +243,8 @@ async function renderTimelineView(content) {
   if (workerId) select.value = workerId;
 
   const loadTimeline = async () => {
-    const result = await api.getAttendance({ WorkerID: select.value, month: currentMonth });
-    const items = result.data || [];
+    const result = await api.getAttendance({ WorkerID: select.value, month: currentMonth, skipCache: true });
+    const items = (result.data || []).map(normalizeRecord);
     const list = content.querySelector('#timelineList');
 
     if (!items.length) {
@@ -336,7 +360,6 @@ function showAttendanceForm(record = null, worker = null) {
       if (!confirm('Delete this attendance record?')) return;
       try {
         await api.deleteAttendance(record.AttendanceID);
-        api.invalidateActionCache('getAttendance');
         showToast('Attendance deleted', 'success');
         close();
         renderView(document.getElementById('pageContainer'));
@@ -356,25 +379,40 @@ function showAttendanceForm(record = null, worker = null) {
       data.TimeCut = 0;
     }
 
+    data.Date = normalizeDate(data.Date || currentDate);
+
     const validation = validateAttendance(data);
     if (!validation.valid) {
       showFormErrors(form, validation.errors);
       return;
     }
 
+    const saveBtn = element.querySelector('#saveAttendance');
+    saveBtn.disabled = true;
+
     try {
+      let savedRecord;
       if (isEdit) {
-        await api.updateAttendance({ ...data, AttendanceID: record.AttendanceID });
+        const result = await api.updateAttendance({ ...data, AttendanceID: record.AttendanceID });
+        savedRecord = normalizeRecord(result.data);
         showToast('Attendance updated', 'success');
       } else {
-        await api.markAttendance(data);
+        const result = await api.markAttendance(data);
+        savedRecord = normalizeRecord(result.data);
         showToast('Attendance marked', 'success');
       }
-      api.invalidateActionCache('getAttendance');
+
+      if (savedRecord) {
+        records = records.filter(r => r.WorkerID !== savedRecord.WorkerID);
+        records.push(savedRecord);
+      }
+
       close();
       renderView(document.getElementById('pageContainer'));
     } catch (e) {
-      showToast(e.message, 'error');
+      showToast(e.message || 'Failed to save attendance', 'error');
+    } finally {
+      saveBtn.disabled = false;
     }
   });
 }

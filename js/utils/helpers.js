@@ -7,6 +7,33 @@ export function formatDate(date) {
   return `${year}-${month}-${day}`;
 }
 
+/** Normalize API/sheet dates to yyyy-MM-dd for reliable comparisons */
+export function normalizeDate(dateValue) {
+  if (!dateValue) return '';
+  const str = String(dateValue).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  if (str.includes('T')) return formatDate(new Date(str));
+  const d = new Date(str + (str.includes('-') && str.length === 10 ? 'T00:00:00' : ''));
+  return isNaN(d.getTime()) ? str : formatDate(d);
+}
+
+/** Normalize API/sheet times to HH:mm */
+export function normalizeTime(timeValue) {
+  if (!timeValue) return '';
+  const str = String(timeValue).trim();
+  if (/^\d{1,2}:\d{2}$/.test(str)) {
+    const [h, m] = str.split(':');
+    return `${String(parseInt(h, 10)).padStart(2, '0')}:${m}`;
+  }
+  if (str.includes('T')) {
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+  }
+  return str;
+}
+
 export function formatDisplayDate(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr + 'T00:00:00');
