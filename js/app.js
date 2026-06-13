@@ -2,7 +2,6 @@ import { renderDashboard } from './pages/dashboard.js';
 import { renderWorkers } from './pages/workers.js';
 import { renderAttendance } from './pages/attendance.js';
 import { renderPayroll } from './pages/payroll.js';
-import { renderLeaves } from './pages/leaves.js';
 import { renderReports } from './pages/reports.js';
 import { renderSettings } from './pages/settings.js';
 import { destroyAllCharts } from './components/charts.js';
@@ -14,7 +13,6 @@ const PAGE_TITLES = {
   workers: { title: 'Workers', subtitle: 'Manage factory workers' },
   attendance: { title: 'Attendance', subtitle: 'Track daily attendance' },
   payroll: { title: 'Payroll', subtitle: 'Salary & payments' },
-  leaves: { title: 'Leaves', subtitle: 'Leave management' },
   reports: { title: 'Reports', subtitle: 'Analytics & exports' },
   settings: { title: 'Settings', subtitle: 'Configuration' }
 };
@@ -27,7 +25,6 @@ const pages = {
   workers: renderWorkers,
   attendance: renderAttendance,
   payroll: renderPayroll,
-  leaves: renderLeaves,
   reports: renderReports,
   settings: renderSettings
 };
@@ -41,7 +38,7 @@ async function navigateTo(page) {
 
   document.querySelectorAll('.nav-item').forEach(item => {
     item.classList.toggle('active', item.dataset.page === page ||
-      (page === 'leaves' || page === 'reports' || page === 'settings') && item.dataset.page === 'more');
+      (page === 'reports' || page === 'settings') && item.dataset.page === 'more');
   });
 
   const titles = PAGE_TITLES[page];
@@ -147,7 +144,7 @@ function closeMoreSheet() {
   sheet.setAttribute('aria-hidden', 'true');
   backdrop.setAttribute('aria-hidden', 'true');
 
-  if (currentPage !== 'leaves' && currentPage !== 'reports' && currentPage !== 'settings') {
+  if (currentPage !== 'reports' && currentPage !== 'settings') {
     document.querySelectorAll('.nav-item').forEach(item => {
       item.classList.toggle('active', item.dataset.page === currentPage);
     });

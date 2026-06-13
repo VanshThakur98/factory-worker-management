@@ -29,7 +29,7 @@ export function renderCalendar(container, year, month, attendanceMap, onDateClic
       } else if (status === 'absent') {
         statusClass = 'absent';
       } else if (status === 'leave') {
-        statusClass = 'leave';
+        statusClass = 'absent';
       }
     }
 
@@ -43,7 +43,6 @@ export function renderCalendar(container, year, month, attendanceMap, onDateClic
     <div class="calendar-legend">
       <div class="legend-item"><span class="legend-dot" style="background:var(--color-present)"></span> Present</div>
       <div class="legend-item"><span class="legend-dot" style="background:var(--color-absent)"></span> Absent</div>
-      <div class="legend-item"><span class="legend-dot" style="background:var(--color-leave)"></span> Leave</div>
       <div class="legend-item"><span class="legend-dot" style="background:var(--color-overtime)"></span> Overtime</div>
     </div>
   `;

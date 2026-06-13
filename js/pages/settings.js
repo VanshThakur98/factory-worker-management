@@ -62,6 +62,14 @@ export async function renderSettings(container) {
         </div>
       </div>
       <div class="form-group">
+        <label>Default Pay Rate Type</label>
+        <select class="form-control" id="defaultRateType">
+          <option value="hour" ${(settings.defaultRateType || 'hour') === 'hour' ? 'selected' : ''}>Per Hour</option>
+          <option value="day" ${settings.defaultRateType === 'day' ? 'selected' : ''}>Per Day</option>
+          <option value="minute" ${settings.defaultRateType === 'minute' ? 'selected' : ''}>Per Minute</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label>Currency</label>
         <select class="form-control" id="currency">
           <option value="USD" ${settings.currency === 'USD' ? 'selected' : ''}>USD ($)</option>
@@ -130,7 +138,8 @@ export async function renderSettings(container) {
       companyName: container.querySelector('#companyName').value,
       regularHours: parseFloat(container.querySelector('#regularHours').value) || 8,
       overtimeMultiplier: parseFloat(container.querySelector('#otMultiplier').value) || 1.5,
-      currency: container.querySelector('#currency').value
+      currency: container.querySelector('#currency').value,
+      defaultRateType: container.querySelector('#defaultRateType').value
     };
 
     Storage.setSettings(newSettings);
@@ -140,7 +149,8 @@ export async function renderSettings(container) {
         CompanyName: newSettings.companyName,
         RegularHours: String(newSettings.regularHours),
         OvertimeMultiplier: String(newSettings.overtimeMultiplier),
-        Currency: newSettings.currency
+        Currency: newSettings.currency,
+        DefaultRateType: newSettings.defaultRateType
       });
       showToast('Settings saved', 'success');
     } catch {

@@ -38,7 +38,7 @@ export function renderAttendanceChart(canvasId, data) {
       datasets: [
         { label: 'Present', data: data.present || [], backgroundColor: 'rgba(52, 168, 83, 0.7)', borderRadius: 4 },
         { label: 'Absent', data: data.absent || [], backgroundColor: 'rgba(234, 67, 53, 0.7)', borderRadius: 4 },
-        { label: 'Leave', data: data.leave || [], backgroundColor: 'rgba(251, 188, 4, 0.7)', borderRadius: 4 }
+        { label: 'Overtime', data: data.overtime || [], backgroundColor: 'rgba(124, 77, 255, 0.7)', borderRadius: 4 }
       ]
     },
     options: {

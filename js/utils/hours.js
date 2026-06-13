@@ -30,7 +30,7 @@ export function roundHours(hours) {
 export function calculateHours(data, regularLimit = REGULAR_HOURS_DEFAULT) {
   const status = (data.AttendanceStatus || '').toLowerCase();
 
-  if (status === 'absent' || status === 'leave') {
+  if (status === 'absent') {
     return { workedHours: 0, regularHours: 0, overtimeHours: 0 };
   }
 
@@ -58,6 +58,11 @@ export function calculateHours(data, regularLimit = REGULAR_HOURS_DEFAULT) {
   if (workedMinutes < 0) workedMinutes = 0;
 
   const workedHours = roundHours(workedMinutes / 60);
+
+  if (status === 'overtime') {
+    return { workedHours, regularHours: 0, overtimeHours: workedHours };
+  }
+
   const regularHours = roundHours(Math.min(workedHours, regularLimit));
   const overtimeHours = roundHours(Math.max(0, workedHours - regularLimit));
 

@@ -30,6 +30,10 @@ export function validateAttendance(data) {
     if (!data.TimeOut) errors.TimeOut = 'Time out is required';
   }
 
+  if (status === 'present' && data.TimeIn && !data.TimeOut) {
+    errors.TimeOut = 'Time out is required when time in is set';
+  }
+
   if (data.TimeCut && (isNaN(parseInt(data.TimeCut)) || parseInt(data.TimeCut) < 0)) {
     errors.TimeCut = 'Time cut must be a positive number';
   }

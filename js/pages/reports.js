@@ -3,7 +3,7 @@ import { getToday, getCurrentMonth, getWeekRange, getMonthName, formatDisplayDat
 import { Storage } from '../services/storage.js';
 import { showToast } from '../components/toast.js';
 import { renderDoughnutChart, destroyAllCharts } from '../components/charts.js';
-import { exportAttendance, exportPayroll, exportWorkers, exportLeaves, exportAttendancePDF, exportPayrollPDF, exportMonthlyReportPDF } from '../services/export.js';
+import { exportAttendance, exportPayroll, exportWorkers, exportAttendancePDF, exportPayrollPDF, exportMonthlyReportPDF } from '../services/export.js';
 import { showDialog } from '../components/dialog.js';
 
 export async function renderReports(container) {
@@ -26,10 +26,6 @@ export async function renderReports(container) {
         <span class="material-symbols-rounded">payments</span>
         <h4>Payroll Summary</h4>
       </div>
-      <div class="card report-type-card" data-report="leaveSummary">
-        <span class="material-symbols-rounded">event_busy</span>
-        <h4>Leave Summary</h4>
-      </div>
       <div class="card report-type-card" data-report="monthlyReport">
         <span class="material-symbols-rounded">summarize</span>
         <h4>Monthly Report</h4>
@@ -47,9 +43,6 @@ export async function renderReports(container) {
         </button>
         <button class="btn btn-outline btn-sm" id="exportPayrollBtn">
           <span class="material-symbols-rounded">payments</span> Payroll
-        </button>
-        <button class="btn btn-outline btn-sm" id="exportLeavesBtn">
-          <span class="material-symbols-rounded">event_busy</span> Leaves
         </button>
       </div>
       <div class="export-actions" style="margin-top:8px">
@@ -92,9 +85,6 @@ export async function renderReports(container) {
           break;
         case 'payrollSummary':
           result = await api.getReports({ reportType: 'payrollSummary', month });
-          break;
-        case 'leaveSummary':
-          result = await api.getReports({ reportType: 'leaveSummary', month });
           break;
         case 'monthlyReport':
           result = await api.getDashboard();
@@ -147,8 +137,7 @@ function renderReportContent(container, type, result) {
         <div class="monthly-stats">
           <div class="monthly-stat present"><div class="value">${data.monthlyStats?.present || 0}</div><div class="label">Present</div></div>
           <div class="monthly-stat absent"><div class="value">${data.monthlyStats?.absent || 0}</div><div class="label">Absent</div></div>
-          <div class="monthly-stat leave"><div class="value">${data.monthlyStats?.leave || 0}</div><div class="label">Leave</div></div>
-          <div class="monthly-stat overtime"><div class="value">${data.monthlyStats?.overtimeDays || 0}</div><div class="label">OT Days</div></div>
+          <div class="monthly-stat overtime"><div class="value">${data.monthlyStats?.overtimeDays || 0}</div><div class="label">Overtime</div></div>
         </div>
         <div class="chart-container"><canvas id="reportChart"></canvas></div>
       </div>
@@ -171,7 +160,7 @@ function renderReportContent(container, type, result) {
 
   const present = records.filter(r => (r.AttendanceStatus || '').toLowerCase() === 'present').length;
   const absent = records.filter(r => (r.AttendanceStatus || '').toLowerCase() === 'absent').length;
-  const leave = records.filter(r => (r.AttendanceStatus || '').toLowerCase() === 'leave').length;
+  const overtime = records.filter(r => (r.AttendanceStatus || '').toLowerCase() === 'overtime').length;
 
   container.innerHTML = `
     <div class="card">
@@ -195,13 +184,11 @@ function renderReportContent(container, type, result) {
     </div>
   `;
 
-  if (type !== 'leaveSummary') {
-    renderDoughnutChart('reportChart',
-      ['Present', 'Absent', 'Leave'],
-      [present, absent, leave],
-      ['#34a853', '#ea4335', '#fbbc04']
-    );
-  }
+  renderDoughnutChart('reportChart',
+    ['Present', 'Absent', 'Overtime'],
+    [present, absent, overtime],
+    ['#34a853', '#ea4335', '#7c4dff']
+  );
 }
 
 function bindExportButtons(container, getData, getType) {
@@ -226,14 +213,6 @@ function bindExportButtons(container, getData, getType) {
       const result = await api.getPayroll({ month: getCurrentMonth() });
       exportPayroll(result.data || []);
       showToast('Payroll exported', 'success');
-    } catch (e) { showToast(e.message, 'error'); }
-  });
-
-  container.querySelector('#exportLeavesBtn').addEventListener('click', async () => {
-    try {
-      const result = await api.getLeaves();
-      exportLeaves(result.data || []);
-      showToast('Leaves exported', 'success');
     } catch (e) { showToast(e.message, 'error'); }
   });
 

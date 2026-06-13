@@ -1,5 +1,6 @@
 import { api } from '../services/api.js';
 import { formatCurrency, getInitials, debounce, statusBadgeClass } from '../utils/helpers.js';
+import { getRateLabel } from '../utils/payroll.js';
 import { validateWorker } from '../utils/validators.js';
 import { showDialog, getFormData, showFormErrors } from '../components/dialog.js';
 import { showToast } from '../components/toast.js';
@@ -122,7 +123,7 @@ function renderWorkersList(container) {
             ${filtered.map(w => `
               <tr>
                 <td>${w.WorkerName}</td>
-                <td>${formatCurrency(w.HourlyRate, settings.currency)}/hr</td>
+                <td>${formatCurrency(w.HourlyRate, settings.currency)}${getRateLabel(w.RateType || 'hour')}</td>
                 <td>${w.Phone || '-'}</td>
                 <td><span class="badge ${statusBadgeClass(w.Status)}">${w.Status}</span></td>
                 <td>
@@ -147,7 +148,7 @@ function renderWorkersList(container) {
           <p>${w.Phone || 'No phone'} · Joined ${w.JoinDate}</p>
         </div>
         <div class="worker-card-actions">
-          <div class="worker-rate">${formatCurrency(w.HourlyRate, settings.currency)}/hr</div>
+          <div class="worker-rate">${formatCurrency(w.HourlyRate, settings.currency)}${getRateLabel(w.RateType || 'hour')}</div>
           <span class="badge ${statusBadgeClass(w.Status)}">${w.Status}</span>
           <button class="action-btn danger" data-action="delete" data-id="${w.WorkerID}" aria-label="Delete worker">
             <span class="material-symbols-rounded">delete</span>
@@ -226,13 +227,21 @@ function showWorkerForm(worker = null) {
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Hourly Rate *</label>
+            <label>Pay Rate *</label>
             <input type="number" name="HourlyRate" class="form-control" step="0.01" min="0" value="${worker?.HourlyRate || ''}" required>
           </div>
           <div class="form-group">
-            <label>Join Date</label>
-            <input type="date" name="JoinDate" class="form-control" value="${worker?.JoinDate || new Date().toISOString().split('T')[0]}">
+            <label>Rate Type *</label>
+            <select name="RateType" class="form-control">
+              <option value="hour" ${(worker?.RateType || 'hour') === 'hour' ? 'selected' : ''}>Per Hour</option>
+              <option value="day" ${worker?.RateType === 'day' ? 'selected' : ''}>Per Day</option>
+              <option value="minute" ${worker?.RateType === 'minute' ? 'selected' : ''}>Per Minute</option>
+            </select>
           </div>
+        </div>
+        <div class="form-group">
+          <label>Join Date</label>
+          <input type="date" name="JoinDate" class="form-control" value="${worker?.JoinDate || new Date().toISOString().split('T')[0]}">
         </div>
         <div class="form-group">
           <label>Status</label>

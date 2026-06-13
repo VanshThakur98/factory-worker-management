@@ -5,6 +5,7 @@ import { calculateHours } from '../utils/hours.js';
 import { showDialog, getFormData, showFormErrors } from '../components/dialog.js';
 import { showToast } from '../components/toast.js';
 import { renderCalendar, buildAttendanceMap } from '../components/calendar.js';
+import { renderTimePicker, initTimePickers } from '../components/time-picker.js';
 import { exportAttendance, exportAttendancePDF } from '../services/export.js';
 import { Storage } from '../services/storage.js';
 
@@ -27,22 +28,34 @@ function normalizeRecord(record) {
 async function loadAttendanceForDate(date) {
   const month = date.substring(0, 7);
   const result = await api.getAttendance({ month, skipCache: true });
-  const allRecords = (result.data || []).map(normalizeRecord);
-  return allRecords.filter(r => normalizeDate(r.Date) === date);
+  return (result.data || []).map(normalizeRecord).filter(r => normalizeDate(r.Date) === date);
 }
 
-function buildRecordMap(attendanceRecords) {
-  const recordMap = {};
-  attendanceRecords.forEach(r => {
-    recordMap[r.WorkerID] = r;
+function splitDayRecords(dayRecords) {
+  const dailyMap = {};
+  const otByWorker = {};
+  const otList = [];
+
+  dayRecords.forEach(r => {
+    const status = String(r.AttendanceStatus || '').toLowerCase();
+    if (status === 'overtime') {
+      otList.push(r);
+      if (!otByWorker[r.WorkerID]) otByWorker[r.WorkerID] = { hours: 0, records: [] };
+      otByWorker[r.WorkerID].hours += parseFloat(r.OvertimeHours) || parseFloat(r.WorkedHours) || 0;
+      otByWorker[r.WorkerID].records.push(r);
+    } else {
+      dailyMap[r.WorkerID] = r;
+    }
   });
-  return recordMap;
+
+  return { dailyMap, otByWorker, otList };
 }
 
 export async function renderAttendance(container) {
   container.innerHTML = `
     <div class="tabs" id="viewTabs">
       <button class="tab active" data-view="daily">Daily</button>
+      <button class="tab" data-view="overtime">Overtime</button>
       <button class="tab" data-view="monthly">Monthly</button>
       <button class="tab" data-view="timeline">Timeline</button>
     </div>
@@ -75,31 +88,16 @@ async function renderView(container) {
   content.innerHTML = '<div class="spinner" style="margin:24px auto"></div>';
 
   try {
-    if (viewMode === 'daily') {
-      await renderDailyView(content);
-    } else if (viewMode === 'monthly') {
-      await renderMonthlyView(content);
-    } else {
-      await renderTimelineView(content);
-    }
+    if (viewMode === 'daily') await renderDailyView(content);
+    else if (viewMode === 'overtime') await renderOvertimeView(content);
+    else if (viewMode === 'monthly') await renderMonthlyView(content);
+    else await renderTimelineView(content);
   } catch (error) {
     content.innerHTML = `<div class="empty-state"><h3>Error</h3><p>${error.message}</p></div>`;
   }
 }
 
-async function renderDailyView(content) {
-  const [attRecords, workersResult] = await Promise.all([
-    loadAttendanceForDate(currentDate),
-    api.getWorkers({ status: 'Active' })
-  ]);
-  records = attRecords;
-  workers = workersResult.data || [];
-
-  const recordMap = buildRecordMap(records);
-
-  const markedCount = records.length;
-  const pendingCount = Math.max(workers.length - markedCount, 0);
-
+function renderDateNav(content, onChange) {
   content.innerHTML = `
     <div class="card date-nav glass">
       <button class="icon-btn" id="prevDay"><span class="material-symbols-rounded">chevron_left</span></button>
@@ -109,42 +107,53 @@ async function renderDailyView(content) {
       </div>
       <button class="icon-btn" id="nextDay"><span class="material-symbols-rounded">chevron_right</span></button>
     </div>
-    <div class="section-title">${workers.length} workers · ${markedCount} marked · ${pendingCount} pending</div>
-    <div id="dailyList"></div>
+    <div id="attendanceList"></div>
   `;
 
   content.querySelector('#prevDay').addEventListener('click', () => {
     currentDate = addDays(currentDate, -1);
-    renderView(document.getElementById('pageContainer'));
+    onChange();
   });
   content.querySelector('#nextDay').addEventListener('click', () => {
     currentDate = addDays(currentDate, 1);
-    renderView(document.getElementById('pageContainer'));
+    onChange();
   });
   content.querySelector('#attendanceDatePicker').addEventListener('change', (e) => {
     currentDate = e.target.value;
-    renderView(document.getElementById('pageContainer'));
+    onChange();
   });
 
-  renderDailyList(content.querySelector('#dailyList'), recordMap);
+  return content.querySelector('#attendanceList');
 }
 
-function renderDailyList(list, recordMap) {
+async function renderDailyView(content) {
+  const [dayRecords, workersResult] = await Promise.all([
+    loadAttendanceForDate(currentDate),
+    api.getWorkers({ status: 'Active' })
+  ]);
+  records = dayRecords;
+  workers = workersResult.data || [];
+  const { dailyMap } = splitDayRecords(dayRecords);
+
+  const markedCount = Object.keys(dailyMap).length;
+  const pendingCount = Math.max(workers.length - markedCount, 0);
+
+  const list = renderDateNav(content, () => renderView(document.getElementById('pageContainer')));
+  content.insertAdjacentHTML('afterbegin', `<div class="section-title">${workers.length} workers · ${markedCount} marked · ${pendingCount} pending</div>`);
+
   if (!workers.length) {
-    list.innerHTML = '<div class="empty-state"><span class="material-symbols-rounded">groups</span><h3>No active workers</h3><p>Add workers first</p></div>';
+    list.innerHTML = '<div class="empty-state"><span class="material-symbols-rounded">groups</span><h3>No active workers</h3></div>';
     return;
   }
 
   list.innerHTML = workers.map(worker => {
-    const record = recordMap[worker.WorkerID];
+    const record = dailyMap[worker.WorkerID];
     const isMarked = !!record;
     const status = (record && record.AttendanceStatus) || 'Not Marked';
     const badgeClass = isMarked ? statusBadgeClass(status) : 'badge-inactive';
     const detail = isMarked
-      ? (record.TimeIn && record.TimeOut
-        ? `${record.TimeIn} → ${record.TimeOut} · ${record.WorkedHours || 0}h`
-        : status)
-      : 'Tap to mark attendance';
+      ? (record.TimeIn && record.TimeOut ? `${record.TimeIn} → ${record.TimeOut} · ${record.WorkedHours || 0}h` : status)
+      : 'Tap to mark';
 
     return `
       <div class="card attendance-worker-row ${isMarked ? 'attendance-marked' : 'attendance-pending'}" data-worker-id="${worker.WorkerID}">
@@ -154,33 +163,97 @@ function renderDailyList(list, recordMap) {
           <p>${detail}</p>
         </div>
         <div class="attendance-worker-actions">
-          ${isMarked ? '<span class="material-symbols-rounded attendance-check" title="Marked">check_circle</span>' : ''}
+          ${isMarked ? '<span class="material-symbols-rounded attendance-check">check_circle</span>' : ''}
           <span class="badge ${badgeClass}">${status}</span>
-          <button class="btn btn-sm ${isMarked ? 'btn-secondary' : 'btn-primary'}" data-mark="${worker.WorkerID}">
-            ${isMarked ? 'Edit' : 'Mark'}
-          </button>
+          <button class="btn btn-sm ${isMarked ? 'btn-secondary' : 'btn-primary'}" data-mark="${worker.WorkerID}">${isMarked ? 'Edit' : 'Mark'}</button>
         </div>
-      </div>
-    `;
+      </div>`;
   }).join('');
 
-  list.querySelectorAll('.attendance-worker-row').forEach(row => {
-    row.addEventListener('click', (e) => {
-      if (e.target.closest('[data-mark]')) return;
-      const worker = workers.find(w => w.WorkerID === row.dataset.workerId);
-      const record = recordMap[worker.WorkerID];
-      if (worker) showAttendanceForm(record || null, worker);
-    });
-  });
+  bindDailyEvents(list, dailyMap);
+}
 
+function bindDailyEvents(list, dailyMap) {
   list.querySelectorAll('[data-mark]').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const worker = workers.find(w => w.WorkerID === btn.dataset.mark);
-      const record = recordMap[worker.WorkerID];
-      if (worker) showAttendanceForm(record || null, worker);
+      if (worker) showAttendanceForm(dailyMap[worker.WorkerID] || null, worker);
     });
   });
+  list.querySelectorAll('.attendance-worker-row').forEach(row => {
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('[data-mark]')) return;
+      const worker = workers.find(w => w.WorkerID === row.dataset.workerId);
+      if (worker) showAttendanceForm(dailyMap[worker.WorkerID] || null, worker);
+    });
+  });
+}
+
+async function renderOvertimeView(content) {
+  const [dayRecords, workersResult] = await Promise.all([
+    loadAttendanceForDate(currentDate),
+    api.getWorkers({ status: 'Active' })
+  ]);
+  workers = workersResult.data || [];
+  const { otByWorker, otList } = splitDayRecords(dayRecords);
+
+  const list = renderDateNav(content, () => renderView(document.getElementById('pageContainer')));
+  const totalOtHours = otList.reduce((s, r) => s + (parseFloat(r.OvertimeHours) || parseFloat(r.WorkedHours) || 0), 0);
+  content.insertAdjacentHTML('afterbegin', `<div class="section-title">${otList.length} OT entries · ${totalOtHours.toFixed(1)}h total overtime</div>`);
+
+  if (!workers.length) {
+    list.innerHTML = '<div class="empty-state"><h3>No active workers</h3></div>';
+    return;
+  }
+
+  list.innerHTML = workers.map(worker => {
+    const ot = otByWorker[worker.WorkerID];
+    const otHours = ot ? ot.hours.toFixed(1) : '0';
+    const entries = ot ? ot.records.length : 0;
+
+    return `
+      <div class="card attendance-worker-row ${entries ? 'attendance-marked' : ''}" style="border-left-color:var(--color-overtime)">
+        <div class="worker-avatar small" style="background:rgba(124,77,255,0.2);color:var(--color-overtime)">${getInitials(worker.WorkerName)}</div>
+        <div class="attendance-worker-info">
+          <strong>${worker.WorkerName}</strong>
+          <p>${entries ? `${entries} OT entry · ${otHours}h cumulative` : 'No overtime logged'}</p>
+        </div>
+        <div class="attendance-worker-actions">
+          <span class="badge badge-overtime">${otHours}h OT</span>
+          <button class="btn btn-sm btn-primary" data-add-ot="${worker.WorkerID}">Add OT</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  list.querySelectorAll('[data-add-ot]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const worker = workers.find(w => w.WorkerID === btn.dataset.addOt);
+      if (worker) showOvertimeForm(null, worker);
+    });
+  });
+
+  if (otList.length) {
+    list.insertAdjacentHTML('beforeend', `
+      <div class="section-title" style="margin-top:16px">Today's OT entries</div>
+      ${otList.map(r => `
+        <div class="card" style="padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <strong>${r.WorkerName}</strong>
+            <p style="font-size:0.8125rem;color:var(--md-sys-color-on-surface-variant)">${r.TimeIn} → ${r.TimeOut} · ${r.OvertimeHours || r.WorkedHours}h</p>
+          </div>
+          <button class="btn btn-sm btn-secondary" data-edit-ot="${r.AttendanceID}">Edit</button>
+        </div>`).join('')}
+    `);
+
+    list.querySelectorAll('[data-edit-ot]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const record = otList.find(r => r.AttendanceID === btn.dataset.editOt);
+        const worker = workers.find(w => w.WorkerID === record.WorkerID);
+        if (record && worker) showOvertimeForm(record, worker);
+      });
+    });
+  }
 }
 
 async function renderMonthlyView(content) {
@@ -198,17 +271,15 @@ async function renderMonthlyView(content) {
       </div>
       <div id="calendarGrid"></div>
     </div>
-    <div id="monthRecords"></div>
-  `;
+    <div class="section-title">${records.length} records this month</div>`;
 
   renderCalendar(content.querySelector('#calendarGrid'), year, month, attMap, (date) => {
     currentDate = date;
     viewMode = 'daily';
-    const container = document.getElementById('pageContainer');
-    container.querySelectorAll('#viewTabs .tab').forEach(t => {
+    document.getElementById('pageContainer').querySelectorAll('#viewTabs .tab').forEach(t => {
       t.classList.toggle('active', t.dataset.view === 'daily');
     });
-    renderView(container);
+    renderView(document.getElementById('pageContainer'));
   });
 
   content.querySelector('#prevMonth').addEventListener('click', () => {
@@ -216,15 +287,11 @@ async function renderMonthlyView(content) {
     currentMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     renderView(document.getElementById('pageContainer'));
   });
-
   content.querySelector('#nextMonth').addEventListener('click', () => {
     const d = new Date(year, month, 1);
     currentMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     renderView(document.getElementById('pageContainer'));
   });
-
-  const monthRecords = content.querySelector('#monthRecords');
-  monthRecords.innerHTML = `<div class="section-title">${records.length} records this month</div>`;
 }
 
 async function renderTimelineView(content) {
@@ -232,12 +299,9 @@ async function renderTimelineView(content) {
   content.innerHTML = `
     <div class="form-group">
       <label>Select Worker</label>
-      <select class="form-control" id="timelineWorker">
-        ${workers.map(w => `<option value="${w.WorkerID}">${w.WorkerName}</option>`).join('')}
-      </select>
+      <select class="form-control" id="timelineWorker">${workers.map(w => `<option value="${w.WorkerID}">${w.WorkerName}</option>`).join('')}</select>
     </div>
-    <div id="timelineList"></div>
-  `;
+    <div id="timelineList"></div>`;
 
   const select = content.querySelector('#timelineWorker');
   if (workerId) select.value = workerId;
@@ -246,27 +310,22 @@ async function renderTimelineView(content) {
     const result = await api.getAttendance({ WorkerID: select.value, month: currentMonth, skipCache: true });
     const items = (result.data || []).map(normalizeRecord);
     const list = content.querySelector('#timelineList');
-
     if (!items.length) {
-      list.innerHTML = '<div class="empty-state"><p>No attendance history</p></div>';
+      list.innerHTML = '<div class="empty-state"><p>No history</p></div>';
       return;
     }
-
     list.innerHTML = items.map(r => {
       const status = (r.AttendanceStatus || '').toLowerCase();
-      const color = status === 'present' || status === 'overtime' ? 'var(--color-present)' :
-                    status === 'absent' ? 'var(--color-absent)' : 'var(--color-leave)';
+      const color = status === 'overtime' ? 'var(--color-overtime)' :
+        status === 'present' ? 'var(--color-present)' : 'var(--color-absent)';
       return `
         <div class="timeline-item">
-          <div class="timeline-marker" style="background:${color}22;color:${color}">
-            <span class="material-symbols-rounded" style="font-size:16px">schedule</span>
-          </div>
+          <div class="timeline-marker" style="background:${color}22;color:${color}"><span class="material-symbols-rounded" style="font-size:16px">schedule</span></div>
           <div class="timeline-content">
             <h4>${formatDisplayDate(r.Date)} — ${r.AttendanceStatus}</h4>
-            <p>${r.TimeIn || '-'} to ${r.TimeOut || '-'} · ${r.WorkedHours}h worked${parseFloat(r.OvertimeHours) > 0 ? ` · ${r.OvertimeHours}h OT` : ''}</p>
+            <p>${r.TimeIn || '-'} to ${r.TimeOut || '-'} · ${r.WorkedHours}h${parseFloat(r.OvertimeHours) > 0 ? ` · ${r.OvertimeHours}h OT` : ''}</p>
           </div>
-        </div>
-      `;
+        </div>`;
     }).join('');
   };
 
@@ -287,140 +346,153 @@ function showAttendanceForm(record = null, worker = null) {
       <form id="attendanceForm">
         <input type="hidden" name="WorkerID" value="${workerId}">
         <input type="hidden" name="Date" value="${(record && record.Date) || currentDate}">
-        <div class="form-group">
-          <label>Date</label>
-          <input type="date" class="form-control" value="${(record && record.Date) || currentDate}" disabled>
-        </div>
+        <div class="form-group"><label>Date</label><input type="date" class="form-control" value="${(record && record.Date) || currentDate}" disabled></div>
         <div class="form-group">
           <label>Status *</label>
           <select name="AttendanceStatus" class="form-control" id="attStatus">
             <option value="Present" ${defaultStatus === 'Present' ? 'selected' : ''}>Present</option>
             <option value="Absent" ${defaultStatus === 'Absent' ? 'selected' : ''}>Absent</option>
-            <option value="Leave" ${defaultStatus === 'Leave' ? 'selected' : ''}>Leave</option>
-            <option value="Overtime" ${defaultStatus === 'Overtime' ? 'selected' : ''}>Overtime</option>
           </select>
         </div>
         <div id="timeFields">
           <div class="section-title" style="margin:12px 0 8px">Working Hours</div>
           <div class="form-row">
-            <div class="form-group">
-              <label>Time In</label>
-              <input type="time" name="TimeIn" class="form-control" value="${(record && record.TimeIn) || '08:00'}">
-            </div>
-            <div class="form-group">
-              <label>Time Out</label>
-              <input type="time" name="TimeOut" class="form-control" value="${(record && record.TimeOut) || '17:00'}">
-            </div>
+            ${renderTimePicker('TimeIn', (record && record.TimeIn) || '08:00', 'Time In')}
+            ${renderTimePicker('TimeOut', (record && record.TimeOut) || '17:00', 'Time Out')}
           </div>
-          <div class="form-group">
-            <label>Time Cut (minutes)</label>
-            <input type="number" name="TimeCut" class="form-control" min="0" value="${(record && record.TimeCut != null) ? record.TimeCut : 60}">
-          </div>
+          <div class="form-group"><label>Time Cut (minutes)</label><input type="number" name="TimeCut" class="form-control" min="0" value="${(record && record.TimeCut != null) ? record.TimeCut : 60}"></div>
           <div id="hoursPreview" class="card" style="padding:12px;font-size:0.875rem"></div>
         </div>
-      </form>
-    `,
+      </form>`,
     footer: `
       ${isEdit ? '<button class="btn btn-danger" id="deleteAttendance">Delete</button>' : ''}
       <button class="btn btn-secondary dialog-cancel">Cancel</button>
-      <button class="btn btn-primary" id="saveAttendance">${isEdit ? 'Update' : 'Mark'}</button>
-    `
+      <button class="btn btn-primary" id="saveAttendance">${isEdit ? 'Update' : 'Mark'}</button>`
   });
 
-  const form = element.querySelector('#attendanceForm');
-  const timeFields = element.querySelector('#timeFields');
-  const hoursPreview = element.querySelector('#hoursPreview');
-  const statusSelect = element.querySelector('#attStatus');
-
-  const updateFields = () => {
-    const status = statusSelect.value.toLowerCase();
-    const showTimes = status === 'present' || status === 'overtime';
-
-    timeFields.style.display = showTimes ? 'block' : 'none';
-
-    if (showTimes) {
-      const data = getFormData(form);
-      const hours = calculateHours(data, parseFloat(settings.regularHours) || 8);
-      hoursPreview.innerHTML = `
-        <strong>Calculated:</strong> ${hours.workedHours}h worked ·
-        ${hours.regularHours}h regular · ${hours.overtimeHours}h overtime
-      `;
-    }
-  };
-
-  statusSelect.addEventListener('change', updateFields);
-  form.addEventListener('input', updateFields);
-  updateFields();
+  setupTimeForm(element, settings, () => {
+    const status = element.querySelector('#attStatus').value.toLowerCase();
+    element.querySelector('#timeFields').style.display = status === 'present' ? 'block' : 'none';
+  });
 
   element.querySelector('.dialog-cancel').addEventListener('click', close);
-
-  const deleteBtn = element.querySelector('#deleteAttendance');
-  if (deleteBtn) {
-    deleteBtn.addEventListener('click', async () => {
-      if (!confirm('Delete this attendance record?')) return;
-      try {
-        await api.deleteAttendance(record.AttendanceID);
-        showToast('Attendance deleted', 'success');
-        close();
-        renderView(document.getElementById('pageContainer'));
-      } catch (e) {
-        showToast(e.message, 'error');
-      }
-    });
-  }
-
-  element.querySelector('#saveAttendance').addEventListener('click', async () => {
-    const data = getFormData(form);
-    const status = data.AttendanceStatus.toLowerCase();
-
-    if (status === 'absent' || status === 'leave') {
+  bindDelete(element, record, close);
+  bindSave(element, record, isEdit, close, (data) => {
+    if (data.AttendanceStatus.toLowerCase() === 'absent') {
       data.TimeIn = '';
       data.TimeOut = '';
       data.TimeCut = 0;
     }
+    return validateAttendance(data);
+  });
+}
 
+function showOvertimeForm(record = null, worker = null) {
+  const isEdit = !!record;
+  const settings = Storage.getSettings();
+  const workerId = (worker && worker.WorkerID) || (record && record.WorkerID) || '';
+  const workerName = (worker && worker.WorkerName) || (record && record.WorkerName) || '';
+
+  const { close, element } = showDialog({
+    title: isEdit ? `Edit OT — ${workerName}` : `Add Overtime — ${workerName}`,
+    content: `
+      <form id="attendanceForm">
+        <input type="hidden" name="WorkerID" value="${workerId}">
+        <input type="hidden" name="Date" value="${(record && record.Date) || currentDate}">
+        <input type="hidden" name="AttendanceStatus" value="Overtime">
+        <div class="form-group"><label>Date</label><input type="date" class="form-control" value="${(record && record.Date) || currentDate}" disabled></div>
+        <div class="section-title" style="margin:12px 0 8px">Overtime Hours</div>
+        <div class="form-row">
+          ${renderTimePicker('TimeIn', (record && record.TimeIn) || '18:00', 'Time In')}
+          ${renderTimePicker('TimeOut', (record && record.TimeOut) || '21:00', 'Time Out')}
+        </div>
+        <div class="form-group"><label>Time Cut (minutes)</label><input type="number" name="TimeCut" class="form-control" min="0" value="${(record && record.TimeCut != null) ? record.TimeCut : 0}"></div>
+        <div id="hoursPreview" class="card" style="padding:12px;font-size:0.875rem"></div>
+      </form>`,
+    footer: `
+      ${isEdit ? '<button class="btn btn-danger" id="deleteAttendance">Delete</button>' : ''}
+      <button class="btn btn-secondary dialog-cancel">Cancel</button>
+      <button class="btn btn-primary" id="saveAttendance">${isEdit ? 'Update' : 'Save OT'}</button>`
+  });
+
+  setupTimeForm(element, settings, null, 'overtime');
+  element.querySelector('.dialog-cancel').addEventListener('click', close);
+  bindDelete(element, record, close);
+  bindSave(element, record, isEdit, close, (data) => {
+    data.AttendanceStatus = 'Overtime';
+    return validateAttendance(data);
+  });
+}
+
+function setupTimeForm(element, settings, onStatusChange, forceStatus) {
+  const form = element.querySelector('#attendanceForm');
+  initTimePickers(form);
+
+  const updatePreview = () => {
+    if (onStatusChange) onStatusChange();
+    const data = getFormData(form);
+    if (forceStatus) data.AttendanceStatus = forceStatus;
+    const status = (data.AttendanceStatus || '').toLowerCase();
+    const preview = element.querySelector('#hoursPreview');
+    if (status === 'absent') return;
+    const hours = calculateHours(data, parseFloat(settings.regularHours) || 8);
+    preview.innerHTML = forceStatus === 'overtime'
+      ? `<strong>Overtime:</strong> ${hours.overtimeHours}h added to cumulative OT`
+      : `<strong>Calculated:</strong> ${hours.workedHours}h worked · ${hours.regularHours}h regular · ${hours.overtimeHours}h overtime`;
+  };
+
+  const statusSelect = element.querySelector('#attStatus');
+  if (statusSelect) statusSelect.addEventListener('change', updatePreview);
+  form.addEventListener('change', updatePreview);
+  form.addEventListener('input', updatePreview);
+  updatePreview();
+}
+
+function bindDelete(element, record, close) {
+  const deleteBtn = element.querySelector('#deleteAttendance');
+  if (!deleteBtn || !record) return;
+  deleteBtn.addEventListener('click', async () => {
+    if (!confirm('Delete this record?')) return;
+    try {
+      await api.deleteAttendance(record.AttendanceID);
+      showToast('Deleted', 'success');
+      close();
+      renderView(document.getElementById('pageContainer'));
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  });
+}
+
+function bindSave(element, record, isEdit, close, validateFn) {
+  element.querySelector('#saveAttendance').addEventListener('click', async () => {
+    const form = element.querySelector('#attendanceForm');
+    const data = getFormData(form);
     data.Date = normalizeDate(data.Date || currentDate);
-
-    const validation = validateAttendance(data);
+    const validation = validateFn(data);
     if (!validation.valid) {
       showFormErrors(form, validation.errors);
       return;
     }
-
     const saveBtn = element.querySelector('#saveAttendance');
     saveBtn.disabled = true;
-
     try {
-      let savedRecord;
       if (isEdit) {
-        const result = await api.updateAttendance({ ...data, AttendanceID: record.AttendanceID });
-        savedRecord = normalizeRecord(result.data);
-        showToast('Attendance updated', 'success');
+        await api.updateAttendance({ ...data, AttendanceID: record.AttendanceID });
+        showToast('Updated', 'success');
       } else {
-        const result = await api.markAttendance(data);
-        savedRecord = normalizeRecord(result.data);
-        showToast('Attendance marked', 'success');
+        await api.markAttendance(data);
+        showToast('Saved', 'success');
       }
-
-      if (savedRecord) {
-        records = records.filter(r => r.WorkerID !== savedRecord.WorkerID);
-        records.push(savedRecord);
-      }
-
       close();
       renderView(document.getElementById('pageContainer'));
     } catch (e) {
-      showToast(e.message || 'Failed to save attendance', 'error');
+      showToast(e.message || 'Save failed', 'error');
     } finally {
       saveBtn.disabled = false;
     }
   });
 }
 
-export function exportAttendanceData() {
-  exportAttendance(records);
-}
-
-export function exportAttendancePDFData(dateRange) {
-  exportAttendancePDF(records, dateRange);
-}
+export function exportAttendanceData() { exportAttendance(records); }
+export function exportAttendancePDFData(dateRange) { exportAttendancePDF(records, dateRange); }

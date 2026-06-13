@@ -1,5 +1,6 @@
 import { api } from '../services/api.js';
-import { formatCurrency, formatDisplayDate, getToday, getMonthName } from '../utils/helpers.js';
+import { formatCurrency, formatDisplayDate, getToday, getMonthName, normalizeDate } from '../utils/helpers.js';
+import { computePayrollFromAttendance } from '../utils/payroll.js';
 import { renderAttendanceChart, renderPayrollChart, destroyAllCharts } from '../components/charts.js';
 import { Storage } from '../services/storage.js';
 
@@ -18,9 +19,7 @@ export async function renderDashboard(container) {
         <input type="date" id="dashboardDate" class="form-control" value="${selectedDate}">
       </div>
     </div>
-    <div class="stat-grid" id="statGrid">
-      ${renderStatSkeleton()}
-    </div>
+    <div class="stat-grid" id="statGrid">${renderStatSkeleton()}</div>
     <div class="card chart-card">
       <div class="section-title">Attendance Overview <span>${getMonthName(month)}</span></div>
       <div class="chart-container"><canvas id="attendanceChart"></canvas></div>
@@ -33,8 +32,7 @@ export async function renderDashboard(container) {
     <div class="card">
       <div class="section-title">Recent Activity</div>
       <div id="recentActivity"></div>
-    </div>
-  `;
+    </div>`;
 
   container.querySelector('#dashboardDate').addEventListener('change', (e) => {
     selectedDate = e.target.value;
@@ -52,26 +50,40 @@ async function loadDashboardData(container, settings) {
   container.querySelector('#recentActivity').innerHTML = '<div class="spinner" style="margin:16px auto"></div>';
 
   try {
-    const result = await api.getDashboard({ date: selectedDate });
-    const data = result.data || {};
+    const [dashResult, attResult, workersResult] = await Promise.all([
+      api.getDashboard({ date: selectedDate }),
+      api.getAttendance({ month, skipCache: true }),
+      api.getWorkers({ status: 'Active' })
+    ]);
+
+    const data = dashResult.data || {};
+    const attendance = (attResult.data || []).map(r => ({ ...r, Date: normalizeDate(r.Date) }));
+    const livePayroll = computePayrollFromAttendance(attendance, workersResult.data || [], settings);
+    const monthlyTotal = livePayroll.reduce((s, r) => s + r.TotalPay, 0);
+
+    data.monthlyPayrollCost = monthlyTotal;
+    if (livePayroll.length) {
+      data.payrollChart = {
+        labels: livePayroll.map(p => p.WorkerName),
+        regularPay: livePayroll.map(p => p.RegularPay),
+        overtimePay: livePayroll.map(p => p.OvertimePay),
+        totalPay: livePayroll.map(p => p.TotalPay)
+      };
+    }
+
     updateStats(data, settings, dateLabel);
     updateMonthlyStats(data.monthlyStats);
     updateRecentActivity(data.recentActivity || []);
 
-    if (data.attendanceChart) {
-      renderAttendanceChart('attendanceChart', data.attendanceChart);
-    }
-    if (data.payrollChart) {
-      renderPayrollChart('payrollChart', data.payrollChart);
-    }
+    if (data.attendanceChart) renderAttendanceChart('attendanceChart', data.attendanceChart);
+    if (data.payrollChart) renderPayrollChart('payrollChart', data.payrollChart);
   } catch (error) {
     container.querySelector('#statGrid').innerHTML = `
       <div class="empty-state wide" style="grid-column:span 2">
         <span class="material-symbols-rounded">cloud_off</span>
         <h3>Unable to load dashboard</h3>
         <p>${error.message}</p>
-      </div>
-    `;
+      </div>`;
   }
 }
 
@@ -87,9 +99,8 @@ function renderStatSkeleton(dateLabel) {
     { icon: 'groups', label: 'Total Workers', color: '#1a73e8' },
     { icon: 'check_circle', label: `Present (${dateLabel})`, color: '#34a853' },
     { icon: 'cancel', label: `Absent (${dateLabel})`, color: '#ea4335' },
-    { icon: 'event_busy', label: `On Leave (${dateLabel})`, color: '#fbbc04' },
-    { icon: 'schedule', label: `Hours (${dateLabel})`, color: '#4285f4' },
     { icon: 'more_time', label: `OT Hours (${dateLabel})`, color: '#7c4dff' },
+    { icon: 'schedule', label: `Hours (${dateLabel})`, color: '#4285f4' },
     { icon: 'payments', label: 'Monthly Payroll', color: '#188038', wide: true }
   ];
 
@@ -100,8 +111,7 @@ function renderStatSkeleton(dateLabel) {
       </div>
       <div class="stat-value">--</div>
       <div class="stat-label">${s.label}</div>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
 function updateStats(data, settings, dateLabel) {
@@ -109,9 +119,8 @@ function updateStats(data, settings, dateLabel) {
     data.totalWorkers,
     data.presentToday,
     data.absentToday,
-    data.onLeaveToday,
-    data.totalHoursToday + 'h',
     data.overtimeHoursToday + 'h',
+    data.totalHoursToday + 'h',
     formatCurrency(data.monthlyPayrollCost, settings.currency)
   ];
 
@@ -129,10 +138,8 @@ function updateMonthlyStats(stats) {
     <div class="monthly-stats">
       <div class="monthly-stat present"><div class="value">${stats.present}</div><div class="label">Present</div></div>
       <div class="monthly-stat absent"><div class="value">${stats.absent}</div><div class="label">Absent</div></div>
-      <div class="monthly-stat leave"><div class="value">${stats.leave}</div><div class="label">Leave</div></div>
-      <div class="monthly-stat overtime"><div class="value">${stats.overtimeDays}</div><div class="label">OT Days</div></div>
-    </div>
-  `;
+      <div class="monthly-stat overtime"><div class="value">${stats.overtimeDays || 0}</div><div class="label">Overtime</div></div>
+    </div>`;
 }
 
 function updateRecentActivity(activities) {
@@ -144,8 +151,10 @@ function updateRecentActivity(activities) {
 
   container.innerHTML = activities.map(a => {
     const status = (a.AttendanceStatus || '').toLowerCase();
-    const dotClass = status === 'present' || status === 'half day' || status === 'overtime' ? 'present' :
-                     status === 'absent' ? 'absent' : 'leave';
+    const dotClass = status === 'overtime' ? 'overtime' :
+      status === 'present' || status === 'half day' ? 'present' : 'absent';
+    const badge = status === 'overtime' ? 'badge-overtime' :
+      dotClass === 'present' ? 'badge-present' : 'badge-absent';
     return `
       <div class="activity-item">
         <div class="activity-dot ${dotClass}"></div>
@@ -153,8 +162,7 @@ function updateRecentActivity(activities) {
           <strong>${a.WorkerName}</strong>
           <span>${formatDisplayDate(a.Date)} · ${a.AttendanceStatus} · ${a.WorkedHours || 0}h</span>
         </div>
-        <span class="badge ${dotClass === 'present' ? 'badge-present' : dotClass === 'absent' ? 'badge-absent' : 'badge-leave'}">${a.AttendanceStatus}</span>
-      </div>
-    `;
+        <span class="badge ${badge}">${a.AttendanceStatus}</span>
+      </div>`;
   }).join('');
 }

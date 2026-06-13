@@ -48,7 +48,8 @@ export const Storage = {
       companyName: 'Factory Worker Management',
       regularHours: 8,
       overtimeMultiplier: 1.5,
-      currency: 'INR'
+      currency: 'INR',
+      defaultRateType: 'hour'
     });
   },
 
